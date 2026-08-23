@@ -57,3 +57,20 @@ def create_refresh_token(user_id: str) -> str:
         settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
     )
+
+def decode_access_token(token: str) -> str:
+    payload = jwt.decode(
+        token,
+        settings.JWT_SECRET_KEY,
+        algorithms=[settings.JWT_ALGORITHM],
+    )
+
+    if payload.get("type") != "access":
+        raise ValueError("Invalid token type")
+
+    user_id = payload.get("sub")
+
+    if not user_id:
+        raise ValueError("Invalid token subject")
+
+    return user_id
