@@ -1,11 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    HTTPException,
+    Response,
+    status,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    decode_refresh_token,
     hash_password,
     verify_password,
 )
@@ -115,3 +124,91 @@ def login(
             is_active=user.is_active,
         ),
     }
+
+
+@router.post("/refresh")
+def refresh_token(
+    response: Response,
+    refresh_token: str | None = Cookie(default=None),
+    db: Session = Depends(get_db),
+):
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required",
+        )
+
+    try:
+        user_id = decode_refresh_token(refresh_token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    user = db.scalar(
+        select(User).where(User.id == user_id)
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    new_access_token = create_access_token(str(user.id))
+
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=15 * 60,
+    )
+
+    return {
+        "message": "Access token refreshed",
+    }
+
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=False,
+        samesite="lax",
+    )
+
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=False,
+        samesite="lax",
+    )
+
+    return {
+        "message": "Logout successful",
+    }
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+)
+def get_me(
+    current_user: User = Depends(get_current_user),
+):
+    return UserResponse(
+        id=str(current_user.id),
+        email=current_user.email,
+        full_name=current_user.full_name,
+        is_active=current_user.is_active,
+    )
