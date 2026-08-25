@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.auth import router as auth_router
 from app.routes.users import router as users_router
 from app.routes.folders import router as folders_router
+from app.routes.files import router as files_router
 
 app = FastAPI(
     title="Cloud Storage Service",
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(folders_router)
+app.include_router(files_router)
 
 @app.get("/")
 def root():

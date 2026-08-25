@@ -16,12 +16,7 @@ cloudinary.config(
 
 def get_resource_type(content_type: str | None) -> str:
     """
-    Determine the Cloudinary resource type from the file MIME type.
-
-    Cloudinary uses:
-    - image for images
-    - video for videos and audio
-    - raw for documents and other files
+    Determine the Cloudinary resource type from the MIME type.
     """
 
     if not content_type:
@@ -46,12 +41,12 @@ def upload_file(
     folder: str = "cloud-storage-service",
 ) -> dict:
     """
-    Upload a file to Cloudinary and return its metadata.
+    Upload a file to Cloudinary.
     """
 
     resource_type = get_resource_type(content_type)
 
-    result = cloudinary.uploader.upload(
+    return cloudinary.uploader.upload(
         file,
         resource_type=resource_type,
         folder=folder,
@@ -59,5 +54,3 @@ def upload_file(
         unique_filename=True,
         overwrite=False,
     )
-
-    return result

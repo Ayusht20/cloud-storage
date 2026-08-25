@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str
     CLOUDINARY_API_SECRET: str
 
+    MAX_FILE_SIZE_MB: int = 50
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
