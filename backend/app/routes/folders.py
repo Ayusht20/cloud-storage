@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status ,Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from app.schemas.folder import (
     FolderCreateRequest,
     FolderListResponse,
     FolderResponse,
+    FolderUpdateRequest,
 )
 
 
@@ -141,3 +142,70 @@ def list_subfolders(
         )
         for folder in folders
     ]
+
+@router.patch(
+    "/{folder_id}",
+    response_model=FolderResponse,
+)
+def update_folder(
+    folder_id: str,
+    folder_data: FolderUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    folder = db.scalar(
+        select(Folder).where(
+            Folder.id == folder_id,
+            Folder.owner_id == current_user.id,
+        )
+    )
+
+    if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Folder not found",
+        )
+
+    folder.name = folder_data.name.strip()
+
+    db.commit()
+    db.refresh(folder)
+
+    return FolderResponse(
+        id=str(folder.id),
+        name=folder.name,
+        owner_id=str(folder.owner_id),
+        parent_id=(
+            str(folder.parent_id)
+            if folder.parent_id
+            else None
+        ),
+    )
+
+
+@router.delete(
+    "/{folder_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_folder(
+    folder_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    folder = db.scalar(
+        select(Folder).where(
+            Folder.id == folder_id,
+            Folder.owner_id == current_user.id,
+        )
+    )
+
+    if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Folder not found",
+        )
+
+    db.delete(folder)
+    db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
