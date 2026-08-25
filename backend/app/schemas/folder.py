@@ -15,3 +15,9 @@ class FolderResponse(BaseModel):
     name: str
     owner_id: str
     parent_id: str | None
+
+
+class FolderListResponse(BaseModel):
+    id: str
+    name: str
+    parent_id: str | None

@@ -8,6 +8,7 @@ from app.models.folder import Folder
 from app.models.user import User
 from app.schemas.folder import (
     FolderCreateRequest,
+    FolderListResponse,
     FolderResponse,
 )
 
@@ -64,3 +65,79 @@ def create_folder(
             else None
         ),
     )
+
+
+@router.get(
+    "",
+    response_model=list[FolderListResponse],
+)
+def list_root_folders(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    folders = db.scalars(
+        select(Folder)
+        .where(
+            Folder.owner_id == current_user.id,
+            Folder.parent_id.is_(None),
+        )
+        .order_by(Folder.name.asc())
+    ).all()
+
+    return [
+        FolderListResponse(
+            id=str(folder.id),
+            name=folder.name,
+            parent_id=(
+                str(folder.parent_id)
+                if folder.parent_id
+                else None
+            ),
+        )
+        for folder in folders
+    ]
+
+
+@router.get(
+    "/{folder_id}",
+    response_model=list[FolderListResponse],
+)
+def list_subfolders(
+    folder_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    parent_folder = db.scalar(
+        select(Folder).where(
+            Folder.id == folder_id,
+            Folder.owner_id == current_user.id,
+        )
+    )
+
+    if not parent_folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Folder not found",
+        )
+
+    folders = db.scalars(
+        select(Folder)
+        .where(
+            Folder.owner_id == current_user.id,
+            Folder.parent_id == folder_id,
+        )
+        .order_by(Folder.name.asc())
+    ).all()
+
+    return [
+        FolderListResponse(
+            id=str(folder.id),
+            name=folder.name,
+            parent_id=(
+                str(folder.parent_id)
+                if folder.parent_id
+                else None
+            ),
+        )
+        for folder in folders
+    ]
