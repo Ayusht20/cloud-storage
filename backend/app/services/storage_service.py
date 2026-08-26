@@ -5,6 +5,7 @@ import cloudinary.uploader
 
 from app.core.config import settings
 
+import cloudinary.utils
 
 cloudinary.config(
     cloud_name=settings.CLOUDINARY_CLOUD_NAME,
@@ -54,3 +55,14 @@ def upload_file(
         unique_filename=True,
         overwrite=False,
     )
+
+def get_file_url(public_id: str, resource_type: str) -> str:
+    """
+    Generate a Cloudinary delivery URL for an uploaded file.
+    """
+
+    return cloudinary.utils.cloudinary_url(
+        public_id,
+        resource_type=resource_type,
+        secure=True,
+    )[0]
