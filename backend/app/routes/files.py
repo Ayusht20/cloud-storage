@@ -191,6 +191,38 @@ def list_files(
         )
         for file in files
     ]
+@router.get(
+    "/{file_id}/download",
+    response_model=FileDownloadResponse,
+)
+def download_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    file_record = db.scalar(
+        select(File).where(
+            File.id == file_id,
+            File.owner_id == current_user.id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    download_url = get_download_url(
+        public_id=file_record.storage_public_id,
+        resource_type=file_record.resource_type,
+    )
+
+    return FileDownloadResponse(
+        file_name=file_record.name,
+        download_url=download_url,
+    )
 
 @router.get(
     "/{file_id}",

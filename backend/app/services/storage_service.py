@@ -66,3 +66,20 @@ def get_file_url(public_id: str, resource_type: str) -> str:
         resource_type=resource_type,
         secure=True,
     )[0]
+
+
+def get_download_url(
+    public_id: str,
+    resource_type: str,
+) -> str:
+    """
+    Generate the Cloudinary delivery URL for a stored asset.
+    """
+
+    url, _ = cloudinary.utils.cloudinary_url(
+        public_id,
+        resource_type=resource_type,
+        secure=True,
+    )
+
+    return url

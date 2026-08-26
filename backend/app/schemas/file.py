@@ -28,3 +28,8 @@ class FileUpdateRequest(BaseModel):
         min_length=1,
         max_length=255,
     )
+
+
+class FileDownloadResponse(BaseModel):
+    file_name: str
+    download_url: str
