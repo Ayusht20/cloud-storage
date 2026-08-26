@@ -100,6 +100,114 @@ def list_root_folders(
         for folder in folders
     ]
 
+@router.get(
+    "/{folder_id}/contents",
+    response_model=FolderContentsResponse,
+)
+def get_folder_contents(
+    folder_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    folder = db.scalar(
+        select(Folder).where(
+            Folder.id == folder_id,
+            Folder.owner_id == current_user.id,
+        )
+    )
+
+    if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Folder not found",
+        )
+
+    folders = db.scalars(
+        select(Folder)
+        .where(
+            Folder.owner_id == current_user.id,
+            Folder.parent_id == folder.id,
+        )
+        .order_by(Folder.name.asc())
+    ).all()
+
+    files = db.scalars(
+        select(File)
+        .where(
+            File.owner_id == current_user.id,
+            File.folder_id == folder.id,
+            File.is_deleted.is_(False),
+        )
+        .order_by(File.name.asc())
+    ).all()
+
+    breadcrumbs = [
+        BreadcrumbItem(
+            id=None,
+            name="My Drive",
+        )
+    ]
+
+    current_folder = folder
+
+    while current_folder:
+        breadcrumbs.append(
+            BreadcrumbItem(
+                id=str(current_folder.id),
+                name=current_folder.name,
+            )
+        )
+
+        if current_folder.parent_id is None:
+            break
+
+        current_folder = db.scalar(
+            select(Folder).where(
+                Folder.id == current_folder.parent_id,
+                Folder.owner_id == current_user.id,
+            )
+        )
+
+        if not current_folder:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Folder hierarchy is inconsistent",
+            )
+
+    breadcrumbs.reverse()
+
+    return FolderContentsResponse(
+        folder=FolderResponse(
+            id=str(folder.id),
+            name=folder.name,
+            owner_id=str(folder.owner_id),
+            parent_id=(
+                str(folder.parent_id)
+                if folder.parent_id
+                else None
+            ),
+        ),
+        breadcrumbs=breadcrumbs,
+        folders=[
+            FolderListResponse(
+                id=str(child.id),
+                name=child.name,
+                parent_id=str(child.parent_id),
+            )
+            for child in folders
+        ],
+        files=[
+            FileListResponse(
+                id=str(file.id),
+                name=file.name,
+                mime_type=file.mime_type,
+                size=file.size,
+                folder_id=str(file.folder_id),
+                is_deleted=file.is_deleted,
+            )
+            for file in files
+        ],
+    )
 
 @router.get(
     "/{folder_id}",

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-
+from app.schemas.file import FileListResponse
 
 class FolderCreateRequest(BaseModel):
     name: str = Field(
@@ -35,3 +35,9 @@ class FolderMoveRequest(BaseModel):
 class BreadcrumbItem(BaseModel):
     id: str | None
     name: str
+
+class FolderContentsResponse(BaseModel):
+    folder: FolderResponse | None
+    breadcrumbs: list[BreadcrumbItem]
+    folders: list[FolderListResponse]
+    files: list[FileListResponse]
