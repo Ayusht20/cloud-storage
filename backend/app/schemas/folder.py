@@ -31,3 +31,7 @@ class FolderUpdateRequest(BaseModel):
 
 class FolderMoveRequest(BaseModel):
     parent_id: str | None = None
+
+class BreadcrumbItem(BaseModel):
+    id: str | None
+    name: str

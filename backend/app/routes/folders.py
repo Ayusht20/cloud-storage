@@ -7,6 +7,7 @@ from app.core.dependencies import get_current_user
 from app.models.folder import Folder
 from app.models.user import User
 from app.schemas.folder import (
+    BreadcrumbItem,
     FolderCreateRequest,
     FolderListResponse,
     FolderMoveRequest,
@@ -307,3 +308,62 @@ def move_folder(
         owner_id=str(folder.owner_id),
         parent_id=str(folder.parent_id),
     )
+
+@router.get(
+    "/{folder_id}/breadcrumbs",
+    response_model=list[BreadcrumbItem],
+)
+def get_folder_breadcrumbs(
+    folder_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    folder = db.scalar(
+        select(Folder).where(
+            Folder.id == folder_id,
+            Folder.owner_id == current_user.id,
+        )
+    )
+
+    if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Folder not found",
+        )
+
+    breadcrumbs = [
+        BreadcrumbItem(
+            id=None,
+            name="My Drive",
+        )
+    ]
+
+    current_folder = folder
+
+    while current_folder:
+        breadcrumbs.append(
+            BreadcrumbItem(
+                id=str(current_folder.id),
+                name=current_folder.name,
+            )
+        )
+
+        if current_folder.parent_id is None:
+            break
+
+        current_folder = db.scalar(
+            select(Folder).where(
+                Folder.id == current_folder.parent_id,
+                Folder.owner_id == current_user.id,
+            )
+        )
+
+        if not current_folder:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Folder hierarchy is inconsistent",
+            )
+
+    breadcrumbs.reverse()
+
+    return breadcrumbs
