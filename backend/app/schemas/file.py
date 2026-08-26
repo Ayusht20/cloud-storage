@@ -1,5 +1,4 @@
-from pydantic import BaseModel
-
+from pydantic import BaseModel, Field
 
 class FileResponse(BaseModel):
     id: str
@@ -22,3 +21,10 @@ class FileListResponse(BaseModel):
     size: int
     folder_id: str | None
     is_deleted: bool
+
+
+class FileUpdateRequest(BaseModel):
+    name: str = Field(
+        min_length=1,
+        max_length=255,
+    )

@@ -7,6 +7,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
     status,
+    Response
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from app.models.user import User
 from app.schemas.file import (
     FileListResponse,
     FileResponse,
+     FileUpdateRequest,
 )
 from app.services.storage_service import upload_file
 
@@ -230,3 +232,82 @@ def get_file(
         ),
         is_deleted=file_record.is_deleted,
     )
+
+
+
+@router.patch(
+    "/{file_id}",
+    response_model=FileResponse,
+)
+def update_file(
+    file_id: str,
+    file_data: FileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    file_record = db.scalar(
+        select(File).where(
+            File.id == file_id,
+            File.owner_id == current_user.id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    file_record.name = file_data.name.strip()
+
+    db.commit()
+    db.refresh(file_record)
+
+    return FileResponse(
+        id=str(file_record.id),
+        name=file_record.name,
+        original_name=file_record.original_name,
+        storage_public_id=file_record.storage_public_id,
+        storage_url=file_record.storage_url,
+        resource_type=file_record.resource_type,
+        mime_type=file_record.mime_type,
+        size=file_record.size,
+        owner_id=str(file_record.owner_id),
+        folder_id=(
+            str(file_record.folder_id)
+            if file_record.folder_id
+            else None
+        ),
+        is_deleted=file_record.is_deleted,
+    )
+
+
+@router.delete(
+    "/{file_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    file_record = db.scalar(
+        select(File).where(
+            File.id == file_id,
+            File.owner_id == current_user.id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    file_record.is_deleted = True
+
+    db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
