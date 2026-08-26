@@ -33,3 +33,6 @@ class FileUpdateRequest(BaseModel):
 class FileDownloadResponse(BaseModel):
     file_name: str
     download_url: str
+
+class FileMoveRequest(BaseModel):
+    folder_id: str | None = None
