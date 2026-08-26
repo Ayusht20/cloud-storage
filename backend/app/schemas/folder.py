@@ -28,3 +28,6 @@ class FolderUpdateRequest(BaseModel):
         min_length=1,
         max_length=255,
     )
+
+class FolderMoveRequest(BaseModel):
+    parent_id: str | None = None

@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.folder import (
     FolderCreateRequest,
     FolderListResponse,
+    FolderMoveRequest,
     FolderResponse,
     FolderUpdateRequest,
 )
@@ -209,3 +210,100 @@ def delete_folder(
     db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch(
+    "/{folder_id}/move",
+    response_model=FolderResponse,
+)
+def move_folder(
+    folder_id: str,
+    move_data: FolderMoveRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    folder = db.scalar(
+        select(Folder).where(
+            Folder.id == folder_id,
+            Folder.owner_id == current_user.id,
+        )
+    )
+
+    if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Folder not found",
+        )
+
+    # Moving to My Drive/root.
+    if move_data.parent_id is None:
+        folder.parent_id = None
+
+        db.commit()
+        db.refresh(folder)
+
+        return FolderResponse(
+            id=str(folder.id),
+            name=folder.name,
+            owner_id=str(folder.owner_id),
+            parent_id=None,
+        )
+
+    # A folder cannot be its own parent.
+    if move_data.parent_id == folder_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A folder cannot be moved inside itself",
+        )
+
+    target_folder = db.scalar(
+        select(Folder).where(
+            Folder.id == move_data.parent_id,
+            Folder.owner_id == current_user.id,
+        )
+    )
+
+    if not target_folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target folder not found",
+        )
+
+    # Walk upward through the target folder's ancestors.
+    # If we encounter the folder being moved, the move would
+    # create a circular hierarchy.
+    current_parent_id = target_folder.parent_id
+
+    while current_parent_id is not None:
+        if current_parent_id == folder.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "A folder cannot be moved inside "
+                    "one of its own descendants"
+                ),
+            )
+
+        current_parent = db.scalar(
+            select(Folder).where(
+                Folder.id == current_parent_id,
+                Folder.owner_id == current_user.id,
+            )
+        )
+
+        if not current_parent:
+            break
+
+        current_parent_id = current_parent.parent_id
+
+    folder.parent_id = target_folder.id
+
+    db.commit()
+    db.refresh(folder)
+
+    return FolderResponse(
+        id=str(folder.id),
+        name=folder.name,
+        owner_id=str(folder.owner_id),
+        parent_id=str(folder.parent_id),
+    )
