@@ -57,8 +57,28 @@ def create_folder(
                 detail="Parent folder not found",
             )
 
+    folder_name = folder_data.name.strip()
+
+    existing_folder = db.scalar(
+        select(Folder).where(
+            Folder.owner_id == current_user.id,
+            Folder.parent_id == (
+                parent_folder.id
+                if parent_folder
+                else None
+            ),
+            Folder.name == folder_name,
+        )
+    )
+
+    if existing_folder:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A folder with this name already exists here",
+        )
+
     folder = Folder(
-        name=folder_data.name.strip(),
+        name=folder_name,
         owner_id=current_user.id,
         parent_id=(
             parent_folder.id
@@ -114,7 +134,6 @@ def list_root_folders(
     ]
 
 
-# IMPORTANT:
 # Keep this route before /{folder_id}.
 @router.get(
     "/contents",
@@ -173,7 +192,6 @@ def get_root_contents(
     )
 
 
-# IMPORTANT:
 # Keep this route before /{folder_id}.
 @router.get(
     "/{folder_id}/contents",
@@ -413,7 +431,24 @@ def update_folder(
             detail="Folder not found",
         )
 
-    folder.name = folder_data.name.strip()
+    new_name = folder_data.name.strip()
+
+    existing_folder = db.scalar(
+        select(Folder).where(
+            Folder.owner_id == current_user.id,
+            Folder.parent_id == folder.parent_id,
+            Folder.name == new_name,
+            Folder.id != folder.id,
+        )
+    )
+
+    if existing_folder:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A folder with this name already exists here",
+        )
+
+    folder.name = new_name
 
     db.commit()
     db.refresh(folder)
@@ -453,7 +488,6 @@ def move_folder(
             detail="Folder not found",
         )
 
-    # Move to My Drive / root.
     if move_data.parent_id is None:
         folder.parent_id = None
 
@@ -467,7 +501,6 @@ def move_folder(
             parent_id=None,
         )
 
-    # A folder cannot be its own parent.
     if move_data.parent_id == folder_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -513,6 +546,22 @@ def move_folder(
             break
 
         current_parent_id = current_parent.parent_id
+
+    # Prevent duplicate folder names in the target location.
+    existing_folder = db.scalar(
+        select(Folder).where(
+            Folder.owner_id == current_user.id,
+            Folder.parent_id == target_folder.id,
+            Folder.name == folder.name,
+            Folder.id != folder.id,
+        )
+    )
+
+    if existing_folder:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A folder with this name already exists in the target folder",
+        )
 
     folder.parent_id = target_folder.id
 

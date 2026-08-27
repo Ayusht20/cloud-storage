@@ -1,13 +1,11 @@
-import os
-
 from fastapi import (
     APIRouter,
     Depends,
     File as FastAPIFile,
     HTTPException,
+    Response,
     UploadFile,
     status,
-    Response
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -54,6 +52,14 @@ async def upload_user_file(
             detail="File name is required",
         )
 
+    filename = uploaded_file.filename.strip()
+
+    if not filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File name cannot be empty",
+        )
+
     if folder_id:
         folder = db.scalar(
             select(Folder).where(
@@ -67,6 +73,21 @@ async def upload_user_file(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Folder not found",
             )
+
+    existing_file = db.scalar(
+        select(File).where(
+            File.owner_id == current_user.id,
+            File.folder_id == folder_id,
+            File.name == filename,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if existing_file:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A file with this name already exists here",
+        )
 
     file_content = await uploaded_file.read()
 
@@ -92,14 +113,17 @@ async def upload_user_file(
     try:
         upload_result = upload_file(
             file=file_content,
-            filename=uploaded_file.filename,
+            filename=filename,
             content_type=uploaded_file.content_type,
-            folder=f"cloud-storage-service/users/{current_user.id}",
+            folder=(
+                f"cloud-storage-service/"
+                f"users/{current_user.id}"
+            ),
         )
 
         file_record = File(
-            name=uploaded_file.filename,
-            original_name=uploaded_file.filename,
+            name=filename,
+            original_name=filename,
             storage_public_id=upload_result["public_id"],
             storage_url=upload_result["secure_url"],
             resource_type=upload_result["resource_type"],
@@ -139,6 +163,7 @@ async def upload_user_file(
         is_deleted=file_record.is_deleted,
     )
 
+
 @router.get(
     "",
     response_model=list[FileListResponse],
@@ -174,6 +199,7 @@ def list_files(
         query = query.where(
             File.folder_id == folder_id
         )
+
     else:
         query = query.where(
             File.folder_id.is_(None)
@@ -196,6 +222,8 @@ def list_files(
         )
         for file in files
     ]
+
+
 @router.get(
     "/{file_id}/download",
     response_model=FileDownloadResponse,
@@ -228,6 +256,7 @@ def download_file(
         file_name=file_record.name,
         download_url=download_url,
     )
+
 
 @router.get(
     "/{file_id}",
@@ -271,7 +300,6 @@ def get_file(
     )
 
 
-
 @router.patch(
     "/{file_id}",
     response_model=FileResponse,
@@ -296,7 +324,103 @@ def update_file(
             detail="File not found",
         )
 
-    file_record.name = file_data.name.strip()
+    new_name = file_data.name.strip()
+
+    existing_file = db.scalar(
+        select(File).where(
+            File.owner_id == current_user.id,
+            File.folder_id == file_record.folder_id,
+            File.name == new_name,
+            File.id != file_record.id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if existing_file:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A file with this name already exists here",
+        )
+
+    file_record.name = new_name
+
+    db.commit()
+    db.refresh(file_record)
+
+    return FileResponse(
+        id=str(file_record.id),
+        name=file_record.name,
+        original_name=file_record.original_name,
+        storage_public_id=file_record.storage_public_id,
+        storage_url=file_record.storage_url,
+        resource_type=file_record.resource_type,
+        mime_type=file_record.mime_type,
+        size=file_record.size,
+        owner_id=str(file_record.owner_id),
+        folder_id=(
+            str(file_record.folder_id)
+            if file_record.folder_id
+            else None
+        ),
+        is_deleted=file_record.is_deleted,
+    )
+
+
+@router.patch(
+    "/{file_id}/move",
+    response_model=FileResponse,
+)
+def move_file(
+    file_id: str,
+    move_data: FileMoveRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    file_record = db.scalar(
+        select(File).where(
+            File.id == file_id,
+            File.owner_id == current_user.id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    if move_data.folder_id:
+        target_folder = db.scalar(
+            select(Folder).where(
+                Folder.id == move_data.folder_id,
+                Folder.owner_id == current_user.id,
+            )
+        )
+
+        if not target_folder:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Target folder not found",
+            )
+
+    existing_file = db.scalar(
+        select(File).where(
+            File.owner_id == current_user.id,
+            File.folder_id == move_data.folder_id,
+            File.name == file_record.name,
+            File.id != file_record.id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if existing_file:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A file with this name already exists in the target folder",
+        )
+
+    file_record.folder_id = move_data.folder_id
 
     db.commit()
     db.refresh(file_record)
@@ -347,66 +471,6 @@ def delete_file(
 
     db.commit()
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.patch(
-    "/{file_id}/move",
-    response_model=FileResponse,
-)
-def move_file(
-    file_id: str,
-    move_data: FileMoveRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    file_record = db.scalar(
-        select(File).where(
-            File.id == file_id,
-            File.owner_id == current_user.id,
-            File.is_deleted.is_(False),
-        )
-    )
-
-    if not file_record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found",
-        )
-
-    if move_data.folder_id:
-        target_folder = db.scalar(
-            select(Folder).where(
-                Folder.id == move_data.folder_id,
-                Folder.owner_id == current_user.id,
-            )
-        )
-
-        if not target_folder:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Target folder not found",
-            )
-
-    file_record.folder_id = move_data.folder_id
-
-    db.commit()
-    db.refresh(file_record)
-
-    return FileResponse(
-        id=str(file_record.id),
-        name=file_record.name,
-        original_name=file_record.original_name,
-        storage_public_id=file_record.storage_public_id,
-        storage_url=file_record.storage_url,
-        resource_type=file_record.resource_type,
-        mime_type=file_record.mime_type,
-        size=file_record.size,
-        owner_id=str(file_record.owner_id),
-        folder_id=(
-            str(file_record.folder_id)
-            if file_record.folder_id
-            else None
-        ),
-        is_deleted=file_record.is_deleted,
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT
     )
