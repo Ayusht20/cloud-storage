@@ -17,6 +17,7 @@ from app.schemas.share import (
     ShareCreateRequest,
     ShareResponse,
     ShareUpdateRequest,
+    SharedFileResponse,
 )
 
 
@@ -105,14 +106,14 @@ def create_share(
 
 @router.get(
     "",
-    response_model=list[ShareResponse],
+    response_model=list[SharedFileResponse],
 )
 def list_shared_files(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    shares = db.scalars(
-        select(Share)
+    results = db.execute(
+        select(Share, File)
         .join(
             File,
             Share.file_id == File.id,
@@ -127,18 +128,23 @@ def list_shared_files(
     ).all()
 
     return [
-        ShareResponse(
-            id=str(share.id),
-            file_id=str(share.file_id),
-            shared_with_user_id=str(
-                share.shared_with_user_id
+        SharedFileResponse(
+            share_id=str(share.id),
+            file_id=str(file.id),
+            file_name=file.name,
+            original_name=file.original_name,
+            mime_type=file.mime_type,
+            size=file.size,
+            owner_id=str(file.owner_id),
+            folder_id=(
+                str(file.folder_id)
+                if file.folder_id
+                else None
             ),
-            email=current_user.email,
             role=share.role,
         )
-        for share in shares
+        for share, file in results
     ]
-
 
 @router.patch(
     "/{share_id}",
