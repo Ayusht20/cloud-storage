@@ -30,6 +30,8 @@ from app.services.storage_service import (
 
 from app.services.permission_service import (
     can_view,
+    can_delete,
+    can_edit,
 )
 
 router = APIRouter(
@@ -331,7 +333,6 @@ def update_file(
     file_record = db.scalar(
         select(File).where(
             File.id == file_id,
-            File.owner_id == current_user.id,
             File.is_deleted.is_(False),
         )
     )
@@ -342,15 +343,27 @@ def update_file(
             detail="File not found",
         )
 
+    if not can_edit(
+        file_record,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to edit this file",
+        )
+
     new_name = file_data.name.strip()
+
     if not new_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File name cannot be empty",
         )
+
     existing_file = db.scalar(
         select(File).where(
-            File.owner_id == current_user.id,
+            File.owner_id == file_record.owner_id,
             File.folder_id == file_record.folder_id,
             File.name == new_name,
             File.id != file_record.id,
@@ -401,7 +414,6 @@ def move_file(
     file_record = db.scalar(
         select(File).where(
             File.id == file_id,
-            File.owner_id == current_user.id,
             File.is_deleted.is_(False),
         )
     )
@@ -412,11 +424,21 @@ def move_file(
             detail="File not found",
         )
 
+    if not can_edit(
+        file_record,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to move this file",
+        )
+
     if move_data.folder_id:
         target_folder = db.scalar(
             select(Folder).where(
                 Folder.id == move_data.folder_id,
-                Folder.owner_id == current_user.id,
+                Folder.owner_id == file_record.owner_id,
             )
         )
 
@@ -428,7 +450,7 @@ def move_file(
 
     existing_file = db.scalar(
         select(File).where(
-            File.owner_id == current_user.id,
+            File.owner_id == file_record.owner_id,
             File.folder_id == move_data.folder_id,
             File.name == file_record.name,
             File.id != file_record.id,
@@ -464,8 +486,6 @@ def move_file(
         ),
         is_deleted=file_record.is_deleted,
     )
-
-
 @router.delete(
     "/{file_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -478,7 +498,6 @@ def delete_file(
     file_record = db.scalar(
         select(File).where(
             File.id == file_id,
-            File.owner_id == current_user.id,
             File.is_deleted.is_(False),
         )
     )
@@ -487,6 +506,16 @@ def delete_file(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
+        )
+
+    if not can_delete(
+        file_record,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this file",
         )
 
     file_record.is_deleted = True
