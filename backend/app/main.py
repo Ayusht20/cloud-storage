@@ -5,7 +5,7 @@ from app.routes.auth import router as auth_router
 from app.routes.users import router as users_router
 from app.routes.folders import router as folders_router
 from app.routes.files import router as files_router
-
+from app.routes.shares import router as shares_router
 app = FastAPI(
     title="Cloud Storage Service",
     
@@ -30,6 +30,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(folders_router)
 app.include_router(files_router)
+app.include_router(shares_router)
 
 @app.get("/")
 def root():
