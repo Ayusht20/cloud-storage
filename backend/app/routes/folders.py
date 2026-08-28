@@ -59,6 +59,12 @@ def create_folder(
 
     folder_name = folder_data.name.strip()
 
+    if not folder_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Folder name cannot be empty",
+        )
+
     existing_folder = db.scalar(
         select(Folder).where(
             Folder.owner_id == current_user.id,
@@ -432,6 +438,11 @@ def update_folder(
         )
 
     new_name = folder_data.name.strip()
+    if not new_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Folder name cannot be empty",
+        )
 
     existing_folder = db.scalar(
         select(Folder).where(

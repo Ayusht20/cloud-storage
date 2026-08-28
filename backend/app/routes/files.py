@@ -325,7 +325,11 @@ def update_file(
         )
 
     new_name = file_data.name.strip()
-
+    if not new_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File name cannot be empty",
+        )
     existing_file = db.scalar(
         select(File).where(
             File.owner_id == current_user.id,
