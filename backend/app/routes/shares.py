@@ -51,7 +51,7 @@ def create_share(
 
     target_user = db.scalar(
         select(User).where(
-            User.email == share_data.email
+            User.email == share_data.email,
         )
     )
 
@@ -99,3 +99,40 @@ def create_share(
         email=target_user.email,
         role=share.role,
     )
+
+
+@router.get(
+    "",
+    response_model=list[ShareResponse],
+)
+def list_shared_files(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    shares = db.scalars(
+        select(Share)
+        .join(
+            File,
+            Share.file_id == File.id,
+        )
+        .where(
+            Share.shared_with_user_id == current_user.id,
+            File.is_deleted.is_(False),
+        )
+        .order_by(
+            Share.created_at.desc()
+        )
+    ).all()
+
+    return [
+        ShareResponse(
+            id=str(share.id),
+            file_id=str(share.file_id),
+            shared_with_user_id=str(
+                share.shared_with_user_id
+            ),
+            email=current_user.email,
+            role=share.role,
+        )
+        for share in shares
+    ]
