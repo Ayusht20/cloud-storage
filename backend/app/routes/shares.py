@@ -2,6 +2,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Response,
     status,
 )
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from app.models.user import User
 from app.schemas.share import (
     ShareCreateRequest,
     ShareResponse,
+    ShareUpdateRequest,
 )
 
 
@@ -136,3 +138,89 @@ def list_shared_files(
         )
         for share in shares
     ]
+
+
+@router.patch(
+    "/{share_id}",
+    response_model=ShareResponse,
+)
+def update_share(
+    share_id: str,
+    share_data: ShareUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    share = db.scalar(
+        select(Share)
+        .join(
+            File,
+            Share.file_id == File.id,
+        )
+        .where(
+            Share.id == share_id,
+            File.owner_id == current_user.id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if not share:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Share not found",
+        )
+
+    share.role = share_data.role.value
+
+    db.commit()
+    db.refresh(share)
+
+    target_user = db.scalar(
+        select(User).where(
+            User.id == share.shared_with_user_id,
+        )
+    )
+
+    return ShareResponse(
+        id=str(share.id),
+        file_id=str(share.file_id),
+        shared_with_user_id=str(
+            share.shared_with_user_id
+        ),
+        email=target_user.email,
+        role=share.role,
+    )
+
+
+@router.delete(
+    "/{share_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_share(
+    share_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    share = db.scalar(
+        select(Share)
+        .join(
+            File,
+            Share.file_id == File.id,
+        )
+        .where(
+            Share.id == share_id,
+            File.owner_id == current_user.id,
+        )
+    )
+
+    if not share:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Share not found",
+        )
+
+    db.delete(share)
+    db.commit()
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT
+    )

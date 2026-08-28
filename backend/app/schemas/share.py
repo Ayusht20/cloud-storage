@@ -13,6 +13,10 @@ class ShareCreateRequest(BaseModel):
     role: ShareRole
 
 
+class ShareUpdateRequest(BaseModel):
+    role: ShareRole
+
+
 class ShareResponse(BaseModel):
     id: str
     file_id: str
