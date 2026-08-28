@@ -10,7 +10,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column ,relationship
 
 from app.models.base import Base
 
@@ -92,4 +92,9 @@ class File(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+    shares = relationship(
+    "Share",
+    back_populates="file",
+    cascade="all, delete-orphan",
     )
