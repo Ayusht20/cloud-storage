@@ -28,6 +28,9 @@ from app.services.storage_service import (
     upload_file,
 )
 
+from app.services.permission_service import (
+    can_view,
+)
 
 router = APIRouter(
     prefix="/files",
@@ -223,7 +226,6 @@ def list_files(
         for file in files
     ]
 
-
 @router.get(
     "/{file_id}/download",
     response_model=FileDownloadResponse,
@@ -236,12 +238,21 @@ def download_file(
     file_record = db.scalar(
         select(File).where(
             File.id == file_id,
-            File.owner_id == current_user.id,
             File.is_deleted.is_(False),
         )
     )
 
     if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    if not can_view(
+        file_record,
+        current_user,
+        db,
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
@@ -257,7 +268,6 @@ def download_file(
         download_url=download_url,
     )
 
-
 @router.get(
     "/{file_id}",
     response_model=FileResponse,
@@ -270,12 +280,21 @@ def get_file(
     file_record = db.scalar(
         select(File).where(
             File.id == file_id,
-            File.owner_id == current_user.id,
             File.is_deleted.is_(False),
         )
     )
 
     if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    if not can_view(
+        file_record,
+        current_user,
+        db,
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
@@ -298,7 +317,6 @@ def get_file(
         ),
         is_deleted=file_record.is_deleted,
     )
-
 
 @router.patch(
     "/{file_id}",
