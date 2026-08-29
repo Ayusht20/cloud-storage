@@ -29,9 +29,19 @@ class SharedFileResponse(BaseModel):
     role: ShareRole
 
 
+class SharedFolderResponse(BaseModel):
+    share_id: str
+    folder_id: str
+    folder_name: str
+    owner_id: str
+    parent_id: str | None
+    role: ShareRole
+
+
 class ShareResponse(BaseModel):
     id: str
-    file_id: str
+    file_id: str | None = None
+    folder_id: str | None = None
     shared_with_user_id: str
     email: EmailStr
     role: ShareRole

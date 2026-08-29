@@ -12,7 +12,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 
-
 class Share(Base):
     __tablename__ = "shares"
 
@@ -22,6 +21,11 @@ class Share(Base):
             "shared_with_user_id",
             name="uq_file_shared_user",
         ),
+        UniqueConstraint(
+            "folder_id",
+            "shared_with_user_id",
+            name="uq_folder_shared_user",
+        ),
     )
 
     id: Mapped[str] = mapped_column(
@@ -30,9 +34,15 @@ class Share(Base):
         default=lambda: str(uuid4()),
     )
 
-    file_id: Mapped[str] = mapped_column(
+    file_id: Mapped[str | None] = mapped_column(
         ForeignKey("files.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+
+    folder_id: Mapped[str | None] = mapped_column(
+        ForeignKey("folders.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
 
@@ -55,6 +65,11 @@ class Share(Base):
 
     file = relationship(
         "File",
+        back_populates="shares",
+    )
+
+    folder = relationship(
+        "Folder",
         back_populates="shares",
     )
 
