@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field ,EmailStr
 from app.schemas.file import FileListResponse
 
 class FolderCreateRequest(BaseModel):
@@ -41,3 +41,4 @@ class FolderContentsResponse(BaseModel):
     breadcrumbs: list[BreadcrumbItem]
     folders: list[FolderListResponse]
     files: list[FileListResponse]
+

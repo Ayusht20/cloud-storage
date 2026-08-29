@@ -45,3 +45,16 @@ class ShareResponse(BaseModel):
     shared_with_user_id: str
     email: EmailStr
     role: ShareRole
+
+class FolderShareCreateRequest(BaseModel):
+    email: EmailStr
+    role: ShareRole
+
+
+class SharedFolderResponse(BaseModel):
+    share_id: str
+    folder_id: str
+    folder_name: str
+    owner_id: str
+    parent_id: str | None
+    role: ShareRole
