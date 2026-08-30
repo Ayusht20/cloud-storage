@@ -90,7 +90,39 @@ def get_trash(
             for folder in folders
         ],
     )
+@router.delete(
+    "/empty",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def empty_trash(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    files = db.scalars(
+        select(File).where(
+            File.owner_id == current_user.id,
+            File.is_deleted.is_(True),
+        )
+    ).all()
 
+    folders = db.scalars(
+        select(Folder).where(
+            Folder.owner_id == current_user.id,
+            Folder.is_deleted.is_(True),
+        )
+    ).all()
+
+    for file in files:
+        db.delete(file)
+
+    for folder in folders:
+        db.delete(folder)
+
+    db.commit()
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT
+    )
 
 @router.post(
     "/files/{file_id}/restore",
@@ -158,6 +190,21 @@ def restore_folder(
             detail="Deleted folder not found",
         )
 
+    if folder.parent_id:
+        parent_folder = db.scalar(
+            select(Folder).where(
+                Folder.id == folder.parent_id,
+            )
+        )
+
+        if parent_folder and parent_folder.is_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Restore the parent folder first"
+                ),
+            )
+
     folder.is_deleted = False
     folder.deleted_at = None
 
@@ -174,7 +221,6 @@ def restore_folder(
         ),
         deleted_at=None,
     )
-
 
 @router.delete(
     "/files/{file_id}/permanent",
@@ -236,3 +282,4 @@ def permanently_delete_folder(
     return Response(
         status_code=status.HTTP_204_NO_CONTENT
     )
+
