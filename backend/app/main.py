@@ -1,6 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from app.routes.auth import router as auth_router
@@ -12,11 +11,10 @@ from app.routes.public_links import router as public_links_router
 from app.routes.search import router as search_router
 from app.routes.trash import router as trash_router
 from app.routes.health import router as health_router
- 
+
 
 app = FastAPI(
     title="Cloud Storage Service",
-    
 )
 
 
@@ -59,11 +57,4 @@ app.include_router(health_router)
 def root():
     return {
         "message": "Cloud Storage Service API is running"
-    }
-
-
-@app.get("/health")
-def health_check():
-    return {
-        "status": "healthy"
     }
