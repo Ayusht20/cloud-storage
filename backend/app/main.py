@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 from app.routes.auth import router as auth_router
 from app.routes.users import router as users_router
@@ -9,6 +11,8 @@ from app.routes.shares import router as shares_router
 from app.routes.public_links import router as public_links_router
 from app.routes.search import router as search_router
 from app.routes.trash import router as trash_router
+from app.routes.health import router as health_router
+ 
 
 app = FastAPI(
     title="Cloud Storage Service",
@@ -29,6 +33,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(
+    request: Request,
+    exc: Exception,
+):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+        },
+    )
 
 app.include_router(auth_router)
 app.include_router(users_router)
@@ -38,6 +53,7 @@ app.include_router(shares_router)
 app.include_router(public_links_router)
 app.include_router(search_router)
 app.include_router(trash_router)
+app.include_router(health_router)
 
 @app.get("/")
 def root():
