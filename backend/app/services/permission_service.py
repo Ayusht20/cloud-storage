@@ -178,3 +178,54 @@ def can_share(
     )
 
     return permission == Permission.OWNER
+
+def can_view_folder(
+    folder: Folder,
+    current_user: User,
+    db: Session,
+) -> bool:
+    permission = get_folder_permission(
+        folder,
+        current_user,
+        db,
+    )
+
+    return permission in {
+        Permission.OWNER,
+        Permission.EDITOR,
+        Permission.VIEWER,
+    }
+
+
+def can_edit_folder(
+    folder: Folder,
+    current_user: User,
+    db: Session,
+) -> bool:
+    permission = get_folder_permission(
+        folder,
+        current_user,
+        db,
+    )
+
+    return permission in {
+        Permission.OWNER,
+        Permission.EDITOR,
+    }
+
+
+def can_delete_folder(
+    folder: Folder,
+    current_user: User,
+    db: Session,
+) -> bool:
+    permission = get_folder_permission(
+        folder,
+        current_user,
+        db,
+    )
+
+    return permission in {
+        Permission.OWNER,
+        Permission.EDITOR,
+    }

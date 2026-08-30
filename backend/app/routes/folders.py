@@ -25,8 +25,11 @@ from app.schemas.folder import (
 )
 from app.services.permission_service import (
     Permission,
+    can_delete_folder,
+    can_edit_folder,
     get_folder_permission,
 )
+
 
 router = APIRouter(
     prefix="/folders",
@@ -50,7 +53,7 @@ def create_folder(
         parent_folder = db.scalar(
             select(Folder).where(
                 Folder.id == folder_data.parent_id,
-                Folder.owner_id == current_user.id,
+                Folder.is_deleted.is_(False),
             )
         )
 
@@ -58,6 +61,19 @@ def create_folder(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Parent folder not found",
+            )
+
+        if not can_edit_folder(
+            parent_folder,
+            current_user,
+            db,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "You do not have permission "
+                    "to create a folder here"
+                ),
             )
 
     folder_name = folder_data.name.strip()
@@ -68,15 +84,22 @@ def create_folder(
             detail="Folder name cannot be empty",
         )
 
+    owner_id = (
+        parent_folder.owner_id
+        if parent_folder
+        else current_user.id
+    )
+
     existing_folder = db.scalar(
         select(Folder).where(
-            Folder.owner_id == current_user.id,
+            Folder.owner_id == owner_id,
             Folder.parent_id == (
                 parent_folder.id
                 if parent_folder
                 else None
             ),
             Folder.name == folder_name,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -88,7 +111,7 @@ def create_folder(
 
     folder = Folder(
         name=folder_name,
-        owner_id=current_user.id,
+        owner_id=owner_id,
         parent_id=(
             parent_folder.id
             if parent_folder
@@ -125,6 +148,7 @@ def list_root_folders(
         .where(
             Folder.owner_id == current_user.id,
             Folder.parent_id.is_(None),
+            Folder.is_deleted.is_(False),
         )
         .order_by(Folder.name.asc())
     ).all()
@@ -157,6 +181,7 @@ def get_root_contents(
         .where(
             Folder.owner_id == current_user.id,
             Folder.parent_id.is_(None),
+            Folder.is_deleted.is_(False),
         )
         .order_by(Folder.name.asc())
     ).all()
@@ -213,6 +238,7 @@ def get_folder_contents(
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -238,20 +264,21 @@ def get_folder_contents(
         select(Folder).where(
             Folder.parent_id == folder.id,
             Folder.is_deleted.is_(False),
-        )
+        ).order_by(Folder.name.asc())
     ).all()
 
     files = db.scalars(
         select(File).where(
             File.folder_id == folder.id,
             File.is_deleted.is_(False),
-        )
+        ).order_by(File.name.asc())
     ).all()
 
     return {
         "folders": folders,
         "files": files,
     }
+
 
 @router.get(
     "/{folder_id}",
@@ -265,6 +292,7 @@ def get_folder(
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -297,6 +325,7 @@ def get_folder(
         ),
     )
 
+
 @router.get(
     "/{folder_id}/breadcrumbs",
     response_model=list[BreadcrumbItem],
@@ -309,11 +338,23 @@ def get_folder_breadcrumbs(
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
-            Folder.owner_id == current_user.id,
+            Folder.is_deleted.is_(False),
         )
     )
 
     if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Folder not found",
+        )
+
+    permission = get_folder_permission(
+        folder,
+        current_user,
+        db,
+    )
+
+    if permission == Permission.NONE:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Folder not found",
@@ -342,7 +383,7 @@ def get_folder_breadcrumbs(
         current_folder = db.scalar(
             select(Folder).where(
                 Folder.id == current_folder.parent_id,
-                Folder.owner_id == current_user.id,
+                Folder.is_deleted.is_(False),
             )
         )
 
@@ -370,7 +411,7 @@ def update_folder(
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
-            Folder.owner_id == current_user.id,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -380,7 +421,18 @@ def update_folder(
             detail="Folder not found",
         )
 
+    if not can_edit_folder(
+        folder,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to edit this folder",
+        )
+
     new_name = folder_data.name.strip()
+
     if not new_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -389,10 +441,11 @@ def update_folder(
 
     existing_folder = db.scalar(
         select(Folder).where(
-            Folder.owner_id == current_user.id,
+            Folder.owner_id == folder.owner_id,
             Folder.parent_id == folder.parent_id,
             Folder.name == new_name,
             Folder.id != folder.id,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -432,7 +485,7 @@ def move_folder(
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
-            Folder.owner_id == current_user.id,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -442,7 +495,29 @@ def move_folder(
             detail="Folder not found",
         )
 
+    if not can_edit_folder(
+        folder,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to move this folder",
+        )
+
+    # Moving to root is only allowed when the user
+    # has ownership of the folder.
     if move_data.parent_id is None:
+
+        if folder.owner_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "You cannot move a shared folder "
+                    "to the root"
+                ),
+            )
+
         folder.parent_id = None
 
         db.commit()
@@ -464,7 +539,7 @@ def move_folder(
     target_folder = db.scalar(
         select(Folder).where(
             Folder.id == move_data.parent_id,
-            Folder.owner_id == current_user.id,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -472,6 +547,28 @@ def move_folder(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Target folder not found",
+        )
+
+    # The destination must also be editable.
+    if not can_edit_folder(
+        target_folder,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "You do not have permission "
+                "to move a folder here"
+            ),
+        )
+
+    # A folder can only be moved inside a folder
+    # belonging to the same owner.
+    if target_folder.owner_id != folder.owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot move the folder to this location",
         )
 
     # Walk through the target folder's ancestors.
@@ -492,29 +589,36 @@ def move_folder(
         current_parent = db.scalar(
             select(Folder).where(
                 Folder.id == current_parent_id,
-                Folder.owner_id == current_user.id,
+                Folder.is_deleted.is_(False),
             )
         )
 
         if not current_parent:
-            break
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Folder hierarchy is inconsistent",
+            )
 
         current_parent_id = current_parent.parent_id
 
     # Prevent duplicate folder names in the target location.
     existing_folder = db.scalar(
         select(Folder).where(
-            Folder.owner_id == current_user.id,
+            Folder.owner_id == folder.owner_id,
             Folder.parent_id == target_folder.id,
             Folder.name == folder.name,
             Folder.id != folder.id,
+            Folder.is_deleted.is_(False),
         )
     )
 
     if existing_folder:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A folder with this name already exists in the target folder",
+            detail=(
+                "A folder with this name already exists "
+                "in the target folder"
+            ),
         )
 
     folder.parent_id = target_folder.id
@@ -542,7 +646,7 @@ def delete_folder(
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
-            Folder.owner_id == current_user.id,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -550,6 +654,16 @@ def delete_folder(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Folder not found",
+        )
+
+    if not can_delete_folder(
+        folder,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this folder",
         )
 
     db.delete(folder)
