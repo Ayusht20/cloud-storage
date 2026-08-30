@@ -53,3 +53,8 @@ class Folder(Base):
     back_populates="folder",
     cascade="all, delete-orphan",
     )
+    public_links = relationship(
+    "PublicLink",
+    back_populates="folder",
+    cascade="all, delete-orphan",
+)

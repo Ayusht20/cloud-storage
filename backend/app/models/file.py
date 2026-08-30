@@ -98,3 +98,8 @@ class File(Base):
     back_populates="file",
     cascade="all, delete-orphan",
     )
+    public_links = relationship(
+    "PublicLink",
+    back_populates="file",
+    cascade="all, delete-orphan",
+)
