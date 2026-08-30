@@ -21,6 +21,7 @@ from app.schemas.public_link import (
 )
 from app.services.storage_service import get_download_url
 
+
 router = APIRouter(
     tags=["Public Links"],
 )
@@ -30,10 +31,6 @@ def get_active_public_link(
     token: str,
     db: Session,
 ) -> PublicLink:
-    """
-    Find a public link and validate its basic state.
-    """
-
     public_link = db.scalar(
         select(PublicLink).where(
             PublicLink.token == token,
@@ -70,10 +67,6 @@ def verify_public_link_password(
     public_link: PublicLink,
     password: str | None,
 ):
-    """
-    Validate an optional public-link password.
-    """
-
     if not public_link.password_hash:
         return
 
@@ -168,3 +161,99 @@ def access_public_link(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="Public resource not found",
     )
+
+
+@router.post(
+    "/public/{token}/contents",
+)
+def get_public_folder_contents(
+    token: str,
+    access_data: PublicLinkAccessRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    public_link = get_active_public_link(
+        token,
+        db,
+    )
+
+    password = (
+        access_data.password
+        if access_data
+        else None
+    )
+
+    verify_public_link_password(
+        public_link,
+        password,
+    )
+
+    if not public_link.folder_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Public link does not point to a folder",
+        )
+
+    folder = db.scalar(
+        select(Folder).where(
+            Folder.id == public_link.folder_id,
+            Folder.is_deleted.is_(False),
+        )
+    )
+
+    if not folder:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Folder not found",
+        )
+
+    folders = db.scalars(
+        select(Folder)
+        .where(
+            Folder.parent_id == folder.id,
+            Folder.owner_id == folder.owner_id,
+            Folder.is_deleted.is_(False),
+        )
+        .order_by(Folder.name.asc())
+    ).all()
+
+    files = db.scalars(
+        select(File)
+        .where(
+            File.folder_id == folder.id,
+            File.owner_id == folder.owner_id,
+            File.is_deleted.is_(False),
+        )
+        .order_by(File.name.asc())
+    ).all()
+
+    return {
+        "folder": {
+            "id": str(folder.id),
+            "name": folder.name,
+        },
+        "folders": [
+            {
+                "id": str(child.id),
+                "name": child.name,
+                "parent_id": (
+                    str(child.parent_id)
+                    if child.parent_id
+                    else None
+                ),
+            }
+            for child in folders
+        ],
+        "files": [
+            {
+                "id": str(file.id),
+                "name": file.name,
+                "mime_type": file.mime_type,
+                "size": file.size,
+                "download_url": get_download_url(
+                    public_id=file.storage_public_id,
+                    resource_type=file.resource_type,
+                ),
+            }
+            for file in files
+        ],
+    }
