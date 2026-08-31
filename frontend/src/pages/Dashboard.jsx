@@ -500,46 +500,55 @@ const Dashboard = () => {
   // MOVE MODAL
   // ==================================================
 
-  const loadMoveFolders = async (
-    parentId = null
-  ) => {
-    setMoveLoading(true);
+ const loadMoveFolders = async (folderId = null) => {
+  setMoveLoading(true);
 
-    try {
+  try {
+    let folderList = [];
+
+    // Root folders
+    if (!folderId) {
+      const data = await folderService.getFolders();
+
+      folderList = Array.isArray(data)
+        ? data
+        : data?.folders || [];
+    }
+
+    // Child folders
+    else {
       const data =
-        await folderService.getFolders(
-          parentId
+        await folderService.getFolderContents(
+          folderId
         );
 
-      /*
-       * Backend may return:
-       *
-       * [...]
-       *
-       * OR
-       *
-       * { folders: [...] }
-       */
-
-      const folderList =
-        Array.isArray(data)
-          ? data
-          : data?.folders || [];
-
-      setMoveFolders(
-        folderList
-      );
-    } catch (err) {
-      setError(
-        err.message ||
-          "Failed to load folders"
-      );
-
-      setMoveFolders([]);
-    } finally {
-      setMoveLoading(false);
+      folderList = data?.folders || [];
     }
-  };
+
+    // Never allow the file's current folder
+    // to be selected as its own destination.
+    folderList = folderList.filter(
+      (folder) =>
+        folder.id !== currentFolder?.id
+    );
+
+    setMoveFolders(folderList);
+  } catch (err) {
+    console.error(
+      "Move folder loading error:",
+      err
+    );
+
+    setError(
+      err.message ||
+        "Failed to load folders"
+    );
+
+    setMoveFolders([]);
+  } finally {
+    setMoveLoading(false);
+  }
+};
 
 
   // ==================================================

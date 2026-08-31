@@ -4,8 +4,6 @@ import api from "./api";
 const folderService = {
   // -----------------------------------------------
   // Root contents
-  // One request gives:
-  // folders + files + root breadcrumb
   // -----------------------------------------------
 
   getRootContents() {
@@ -17,8 +15,10 @@ const folderService = {
 
   // -----------------------------------------------
   // Folder contents
-  // One request gives:
-  // subfolders + files
+  //
+  // Returns:
+  // - child folders
+  // - files
   // -----------------------------------------------
 
   getFolderContents(
@@ -33,25 +33,16 @@ const folderService = {
 
 
   // -----------------------------------------------
-  // Folder picker navigation
+  // Root folders
   //
-  // null = root folders
-  // UUID = direct children of that folder
+  // IMPORTANT:
+  // /folders/{id} returns the folder itself,
+  // NOT its children.
   // -----------------------------------------------
 
-  getFolders(
-    parentId = null
-  ) {
-    if (!parentId) {
-      return api.get(
-        "/folders"
-      );
-    }
-
+  getFolders() {
     return api.get(
-      `/folders/${encodeURIComponent(
-        parentId
-      )}`
+      "/folders"
     );
   },
 
@@ -71,10 +62,6 @@ const folderService = {
 
   // -----------------------------------------------
   // Breadcrumbs
-  //
-  // Kept for compatibility.
-  // Dashboard navigation should maintain
-  // breadcrumbs locally instead.
   // -----------------------------------------------
 
   getBreadcrumbs(folderId) {
