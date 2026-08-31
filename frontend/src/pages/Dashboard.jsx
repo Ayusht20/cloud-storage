@@ -88,44 +88,45 @@ const Dashboard = () => {
   };
 
 
-  const loadFolderContents =
-    async (folder) => {
-      setLoading(true);
-      setError("");
+const loadFolderContents = async (folder) => {
+  setLoading(true);
+  setError("");
 
-      try {
-        const data =
-          await folderService.getFolderContents(
-            folder.id
-          );
+  try {
+    const [
+      data,
+      breadcrumbData,
+    ] = await Promise.all([
+      folderService.getFolderContents(
+        folder.id
+      ),
+      folderService.getBreadcrumbs(
+        folder.id
+      ),
+    ]);
 
-        setCurrentFolder(folder);
+    setCurrentFolder(folder);
 
-        setFolders(
-          data?.folders || []
-        );
+    setFolders(
+      data?.folders || []
+    );
 
-        setFiles(
-          data?.files || []
-        );
+    setFiles(
+      data?.files || []
+    );
 
-        const breadcrumbData =
-          await folderService.getBreadcrumbs(
-            folder.id
-          );
-
-        setBreadcrumbs(
-          breadcrumbData || []
-        );
-      } catch (err) {
-        setError(
-          err.message ||
-            "Failed to open folder"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+    setBreadcrumbs(
+      breadcrumbData || []
+    );
+  } catch (err) {
+    setError(
+      err.message ||
+        "Failed to open folder"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   useEffect(() => {
