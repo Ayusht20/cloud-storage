@@ -15,11 +15,13 @@ import {
   X,
   Check,
   FolderOpen,
+  Download,
 } from "lucide-react";
 
 import Layout from "../components/Layout";
 import FolderCard from "../components/FolderCard";
 import FileCard from "../components/FileCard";
+import FilePreviewModal from "../components/FilePreviewModal";
 
 import fileService from "../services/fileService";
 import folderService from "../services/folderService";
@@ -56,6 +58,20 @@ const Dashboard = () => {
 
 
   // ==================================================
+  // PREVIEW
+  // ==================================================
+
+  const [previewFile, setPreviewFile] =
+    useState(null);
+
+  const [previewUrl, setPreviewUrl] =
+    useState("");
+
+  const [previewLoading, setPreviewLoading] =
+    useState(false);
+
+
+  // ==================================================
   // MOVE MODAL
   // ==================================================
 
@@ -79,7 +95,7 @@ const Dashboard = () => {
 
 
   // ==================================================
-  // LOAD ROOT CONTENTS
+  // LOAD ROOT
   // ==================================================
 
   const loadRootContents = async () => {
@@ -115,12 +131,7 @@ const Dashboard = () => {
 
 
   // ==================================================
-  // LOAD FOLDER CONTENTS
-  //
-  // IMPORTANT:
-  // Only ONE API call.
-  //
-  // Breadcrumbs are handled locally.
+  // LOAD FOLDER
   // ==================================================
 
   const loadFolderContents = async (
@@ -145,7 +156,6 @@ const Dashboard = () => {
       setFiles(
         data?.files || []
       );
-
 
       if (nextBreadcrumbs) {
         setBreadcrumbs(
@@ -265,7 +275,64 @@ const Dashboard = () => {
 
 
   // ==================================================
-  // DOWNLOAD
+  // VIEW FILE
+  // ==================================================
+
+  const handleView = async (file) => {
+    setError("");
+
+    setPreviewFile(file);
+    setPreviewUrl("");
+    setPreviewLoading(true);
+
+    try {
+      const data =
+        await fileService.getFile(
+          file.id
+        );
+
+      /*
+       * Backend returns storage_url.
+       */
+
+      const url =
+        data?.storage_url ||
+        data?.url ||
+        data?.download_url;
+
+      if (!url) {
+        throw new Error(
+          "Preview URL was not returned"
+        );
+      }
+
+      setPreviewUrl(url);
+    } catch (err) {
+      setPreviewFile(null);
+
+      setError(
+        err.message ||
+          "Unable to preview this file"
+      );
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+
+  // ==================================================
+  // CLOSE PREVIEW
+  // ==================================================
+
+  const handleClosePreview = () => {
+    setPreviewFile(null);
+    setPreviewUrl("");
+    setPreviewLoading(false);
+  };
+
+
+  // ==================================================
+  // DOWNLOAD FILE
   // ==================================================
 
   const handleDownload = async (
@@ -279,17 +346,54 @@ const Dashboard = () => {
           file.id
         );
 
-      if (!data?.download_url) {
+      const downloadUrl =
+        data?.download_url;
+
+      if (!downloadUrl) {
         throw new Error(
           "Download URL was not returned"
         );
       }
 
-      window.open(
-        data.download_url,
-        "_blank",
-        "noopener,noreferrer"
+      /*
+       * Let the browser download the
+       * original file from storage.
+       *
+       * We intentionally do NOT fetch it
+       * as JSON/blob here because the backend
+       * already provides the proper file URL.
+       */
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+      link.href = downloadUrl;
+
+      link.target = "_blank";
+
+      link.rel =
+        "noopener noreferrer";
+
+      /*
+       * This asks the browser to download
+       * rather than navigating the application.
+       *
+       * The storage response determines the
+       * actual original file format.
+       */
+
+      link.download =
+        file.name || "";
+
+      document.body.appendChild(
+        link
       );
+
+      link.click();
+
+      link.remove();
     } catch (err) {
       setError(
         err.message ||
@@ -346,7 +450,7 @@ const Dashboard = () => {
 
 
   // ==================================================
-  // DELETE
+  // DELETE FILE
   // ==================================================
 
   const handleDeleteFile = async (
@@ -408,7 +512,7 @@ const Dashboard = () => {
 
 
   // ==================================================
-  // BREADCRUMB NAVIGATION
+  // BREADCRUMB
   // ==================================================
 
   const handleBreadcrumbClick =
@@ -416,7 +520,6 @@ const Dashboard = () => {
       breadcrumb,
       index
     ) => {
-      // Root
       if (
         index === 0 ||
         !breadcrumb.id
@@ -425,8 +528,6 @@ const Dashboard = () => {
         return;
       }
 
-
-      // Already here
       if (
         currentFolder?.id ===
         breadcrumb.id
@@ -434,13 +535,11 @@ const Dashboard = () => {
         return;
       }
 
-
       const nextBreadcrumbs =
         breadcrumbs.slice(
           0,
           index + 1
         );
-
 
       await loadFolderContents(
         {
@@ -457,7 +556,6 @@ const Dashboard = () => {
   // ==================================================
 
   const handleBack = async () => {
-    // Already root
     if (
       breadcrumbs.length <= 1
     ) {
@@ -465,26 +563,21 @@ const Dashboard = () => {
       return;
     }
 
-
     const nextBreadcrumbs =
       breadcrumbs.slice(
         0,
         -1
       );
 
-
     const parent =
       nextBreadcrumbs[
         nextBreadcrumbs.length - 1
       ];
 
-
-    // Parent is root
     if (!parent.id) {
       await loadRootContents();
       return;
     }
-
 
     await loadFolderContents(
       {
@@ -497,63 +590,57 @@ const Dashboard = () => {
 
 
   // ==================================================
-  // MOVE MODAL
+  // MOVE
   // ==================================================
 
- const loadMoveFolders = async (folderId = null) => {
-  setMoveLoading(true);
+  const loadMoveFolders = async (
+    folderId = null
+  ) => {
+    setMoveLoading(true);
 
-  try {
-    let folderList = [];
+    try {
+      let folderList = [];
 
-    // Root folders
-    if (!folderId) {
-      const data = await folderService.getFolders();
+      if (!folderId) {
+        const data =
+          await folderService.getFolders();
 
-      folderList = Array.isArray(data)
-        ? data
-        : data?.folders || [];
-    }
+        folderList =
+          Array.isArray(data)
+            ? data
+            : data?.folders || [];
+      } else {
+        const data =
+          await folderService.getFolderContents(
+            folderId
+          );
 
-    // Child folders
-    else {
-      const data =
-        await folderService.getFolderContents(
-          folderId
+        folderList =
+          data?.folders || [];
+      }
+
+      folderList =
+        folderList.filter(
+          (folder) =>
+            folder.id !==
+            currentFolder?.id
         );
 
-      folderList = data?.folders || [];
+      setMoveFolders(
+        folderList
+      );
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to load folders"
+      );
+
+      setMoveFolders([]);
+    } finally {
+      setMoveLoading(false);
     }
+  };
 
-    // Never allow the file's current folder
-    // to be selected as its own destination.
-    folderList = folderList.filter(
-      (folder) =>
-        folder.id !== currentFolder?.id
-    );
-
-    setMoveFolders(folderList);
-  } catch (err) {
-    console.error(
-      "Move folder loading error:",
-      err
-    );
-
-    setError(
-      err.message ||
-        "Failed to load folders"
-    );
-
-    setMoveFolders([]);
-  } finally {
-    setMoveLoading(false);
-  }
-};
-
-
-  // ==================================================
-  // OPEN MOVE MODAL
-  // ==================================================
 
   const handleMove = async (
     file
@@ -571,10 +658,6 @@ const Dashboard = () => {
     await loadMoveFolders(null);
   };
 
-
-  // ==================================================
-  // OPEN FOLDER INSIDE MOVE MODAL
-  // ==================================================
 
   const handleMoveFolderOpen =
     async (folder) => {
@@ -596,10 +679,6 @@ const Dashboard = () => {
     };
 
 
-  // ==================================================
-  // MOVE MODAL BREADCRUMB
-  // ==================================================
-
   const handleMoveBreadcrumb =
     async (
       breadcrumb,
@@ -620,10 +699,6 @@ const Dashboard = () => {
       );
     };
 
-
-  // ==================================================
-  // MOVE MODAL BACK
-  // ==================================================
 
   const handleMoveBack =
     async () => {
@@ -654,10 +729,6 @@ const Dashboard = () => {
     };
 
 
-  // ==================================================
-  // CLOSE MOVE MODAL
-  // ==================================================
-
   const closeMoveModal = () => {
     if (moving) {
       return;
@@ -675,27 +746,16 @@ const Dashboard = () => {
   };
 
 
-  // ==================================================
-  // CONFIRM MOVE
-  // ==================================================
-
   const handleConfirmMove =
     async () => {
       if (!fileToMove) {
         return;
       }
 
-
       const destination =
         movePath[
           movePath.length - 1
         ];
-
-
-      /*
-       * Prevent moving a file into
-       * the folder it already belongs to.
-       */
 
       if (
         destination.id ===
@@ -708,32 +768,16 @@ const Dashboard = () => {
         return;
       }
 
-
       setMoving(true);
       setError("");
 
       try {
-        /*
-         * IMPORTANT:
-         *
-         * destination.id is the REAL
-         * folder UUID.
-         *
-         * Root = null.
-         */
-
         await fileService.moveFile(
           fileToMove.id,
           destination.id || null
         );
 
-
         closeMoveModal();
-
-
-        /*
-         * Refresh only current location.
-         */
 
         if (currentFolder) {
           await loadFolderContents(
@@ -779,7 +823,7 @@ const Dashboard = () => {
 
 
   // ==================================================
-  // UI
+  // RENDER
   // ==================================================
 
   return (
@@ -790,15 +834,11 @@ const Dashboard = () => {
 
       <div className="mx-auto max-w-7xl">
 
-
-        {/* ==========================================
-            HEADER
-            ========================================== */}
+        {/* HEADER */}
 
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
 
           <div>
-
             <h1 className="text-2xl font-bold text-slate-900">
               My Files
             </h1>
@@ -806,7 +846,6 @@ const Dashboard = () => {
             <p className="mt-1 text-sm text-slate-500">
               Manage your files and folders
             </p>
-
           </div>
 
 
@@ -816,13 +855,9 @@ const Dashboard = () => {
               onClick={
                 handleCreateFolder
               }
-              disabled={uploading}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
             >
-              <FolderPlus
-                size={18}
-              />
-
+              <FolderPlus size={18} />
               New folder
             </button>
 
@@ -832,11 +867,9 @@ const Dashboard = () => {
                 handleUploadClick
               }
               disabled={uploading}
-              className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
             >
-              <Upload
-                size={18}
-              />
+              <Upload size={18} />
 
               {uploading
                 ? "Uploading..."
@@ -858,9 +891,7 @@ const Dashboard = () => {
         </div>
 
 
-        {/* ==========================================
-            BREADCRUMBS
-            ========================================== */}
+        {/* BREADCRUMBS */}
 
         <div className="mb-4 flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white px-4 py-3">
 
@@ -868,7 +899,6 @@ const Dashboard = () => {
             size={17}
             className="shrink-0 text-slate-400"
           />
-
 
           {breadcrumbs.map(
             (
@@ -890,7 +920,6 @@ const Dashboard = () => {
                   />
                 )}
 
-
                 <button
                   onClick={() =>
                     handleBreadcrumbClick(
@@ -902,7 +931,7 @@ const Dashboard = () => {
                     index ===
                     breadcrumbs.length - 1
                   }
-                  className={`text-sm font-medium transition ${
+                  className={`text-sm font-medium ${
                     index ===
                     breadcrumbs.length - 1
                       ? "cursor-default text-slate-900"
@@ -921,9 +950,7 @@ const Dashboard = () => {
         </div>
 
 
-        {/* ==========================================
-            BACK
-            ========================================== */}
+        {/* BACK */}
 
         {currentFolder && (
           <button
@@ -931,22 +958,15 @@ const Dashboard = () => {
               handleBack
             }
             disabled={loading}
-            className="mb-6 flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mb-6 flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-50"
           >
-
-            <ArrowLeft
-              size={17}
-            />
-
+            <ArrowLeft size={17} />
             Back
-
           </button>
         )}
 
 
-        {/* ==========================================
-            ERROR
-            ========================================== */}
+        {/* ERROR */}
 
         {error && (
           <div className="mb-6 flex items-center justify-between rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
@@ -959,7 +979,6 @@ const Dashboard = () => {
               onClick={() =>
                 setError("")
               }
-              className="ml-4 font-semibold text-red-500 hover:text-red-700"
             >
               ×
             </button>
@@ -968,9 +987,7 @@ const Dashboard = () => {
         )}
 
 
-        {/* ==========================================
-            LOADING
-            ========================================== */}
+        {/* CONTENT */}
 
         {loading ? (
           <div className="flex min-h-64 items-center justify-center">
@@ -989,10 +1006,7 @@ const Dashboard = () => {
         ) : (
           <>
 
-
-            {/* ========================================
-                FOLDERS
-                ======================================== */}
+            {/* FOLDERS */}
 
             <section className="mb-10">
 
@@ -1010,7 +1024,6 @@ const Dashboard = () => {
                   </h2>
 
                 </div>
-
 
                 <span className="text-xs text-slate-400">
                   {
@@ -1054,19 +1067,13 @@ const Dashboard = () => {
                     No folders here
                   </p>
 
-                  <p className="mt-1 text-sm text-slate-400">
-                    Create a folder to organize your files.
-                  </p>
-
                 </div>
               )}
 
             </section>
 
 
-            {/* ========================================
-                FILES
-                ======================================== */}
+            {/* FILES */}
 
             <section>
 
@@ -1084,7 +1091,6 @@ const Dashboard = () => {
                   </h2>
 
                 </div>
-
 
                 <span className="text-xs text-slate-400">
                   {
@@ -1107,6 +1113,9 @@ const Dashboard = () => {
                         }
                         file={
                           file
+                        }
+                        onView={
+                          handleView
                         }
                         onDownload={
                           handleDownload
@@ -1137,10 +1146,6 @@ const Dashboard = () => {
                     No files here
                   </p>
 
-                  <p className="mt-1 text-sm text-slate-400">
-                    Upload files to see them here.
-                  </p>
-
                 </div>
               )}
 
@@ -1153,18 +1158,32 @@ const Dashboard = () => {
 
 
       {/* ==================================================
-          MOVE FILE MODAL
+          PREVIEW MODAL
+          ================================================== */}
+
+      {previewFile && (
+        <FilePreviewModal
+          file={previewFile}
+          previewUrl={previewUrl}
+          loading={previewLoading}
+          onClose={
+            handleClosePreview
+          }
+          onDownload={
+            handleDownload
+          }
+        />
+      )}
+
+
+      {/* ==================================================
+          MOVE MODAL
           ================================================== */}
 
       {moveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
 
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-
-
-            {/* ------------------------------------------
-                HEADER
-                ------------------------------------------ */}
 
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
 
@@ -1175,7 +1194,7 @@ const Dashboard = () => {
                 </h2>
 
                 <p
-                  className="mt-1 max-w-sm truncate text-xs text-slate-400"
+                  className="mt-1 truncate text-xs text-slate-400"
                   title={
                     fileToMove?.name
                   }
@@ -1193,19 +1212,15 @@ const Dashboard = () => {
                   closeMoveModal
                 }
                 disabled={moving}
-                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
               >
-                <X
-                  size={19}
-                />
+                <X size={19} />
               </button>
 
             </div>
 
 
-            {/* ------------------------------------------
-                MOVE BREADCRUMBS
-                ------------------------------------------ */}
+            {/* MOVE BREADCRUMB */}
 
             <div className="border-b border-slate-100 px-5 py-3">
 
@@ -1231,7 +1246,6 @@ const Dashboard = () => {
                         />
                       )}
 
-
                       <button
                         onClick={() =>
                           handleMoveBreadcrumb(
@@ -1243,12 +1257,7 @@ const Dashboard = () => {
                           index ===
                           movePath.length - 1
                         }
-                        className={`rounded-md px-2 py-1 text-xs font-medium ${
-                          index ===
-                          movePath.length - 1
-                            ? "cursor-default bg-slate-100 text-slate-800"
-                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                        }`}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
                       >
                         {
                           breadcrumb.name
@@ -1264,24 +1273,14 @@ const Dashboard = () => {
             </div>
 
 
-            {/* ------------------------------------------
-                FOLDER LIST
-                ------------------------------------------ */}
+            {/* FOLDERS */}
 
             <div className="max-h-80 overflow-y-auto p-3">
 
               {moveLoading ? (
                 <div className="flex min-h-48 items-center justify-center">
 
-                  <div className="text-center">
-
-                    <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
-
-                    <p className="text-sm text-slate-400">
-                      Loading folders...
-                    </p>
-
-                  </div>
+                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
 
                 </div>
               ) : moveFolders.length >
@@ -1289,62 +1288,50 @@ const Dashboard = () => {
                 <div className="space-y-1">
 
                   {moveFolders.map(
-                    (folder) => {
+                    (folder) => (
+                      <button
+                        key={
+                          folder.id
+                        }
+                        onClick={() =>
+                          handleMoveFolderOpen(
+                            folder
+                          )
+                        }
+                        disabled={
+                          moving ||
+                          folder.id ===
+                            currentFolder?.id
+                        }
+                        className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left hover:bg-slate-50 disabled:opacity-40"
+                      >
 
-                      const isCurrent =
-                        folder.id ===
-                        currentFolder?.id;
+                        <div className="flex min-w-0 items-center gap-3">
 
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
 
-                      return (
-                        <button
-                          key={
-                            folder.id
-                          }
-                          onClick={() =>
-                            handleMoveFolderOpen(
-                              folder
-                            )
-                          }
-                          disabled={
-                            moving ||
-                            isCurrent
-                          }
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition ${
-                            isCurrent
-                              ? "cursor-not-allowed bg-slate-50 opacity-50"
-                              : "hover:bg-slate-50"
-                          }`}
-                        >
-
-                          <div className="flex min-w-0 items-center gap-3">
-
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-
-                              <Folder
-                                size={18}
-                              />
-
-                            </div>
-
-
-                            <span className="truncate text-sm font-medium text-slate-700">
-                              {
-                                folder.name
-                              }
-                            </span>
+                            <Folder
+                              size={18}
+                              className="text-slate-600"
+                            />
 
                           </div>
 
+                          <span className="truncate text-sm font-medium text-slate-700">
+                            {
+                              folder.name
+                            }
+                          </span>
 
-                          <ChevronRight
-                            size={17}
-                            className="shrink-0 text-slate-300"
-                          />
+                        </div>
 
-                        </button>
-                      );
-                    }
+                        <ChevronRight
+                          size={17}
+                          className="text-slate-300"
+                        />
+
+                      </button>
+                    )
                   )}
 
                 </div>
@@ -1370,9 +1357,7 @@ const Dashboard = () => {
             </div>
 
 
-            {/* ------------------------------------------
-                FOOTER
-                ------------------------------------------ */}
+            {/* FOOTER */}
 
             <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4">
 
@@ -1382,7 +1367,7 @@ const Dashboard = () => {
                   Destination
                 </p>
 
-                <p className="max-w-56 truncate text-sm font-semibold text-slate-700">
+                <p className="truncate text-sm font-semibold text-slate-700">
                   {
                     movePath[
                       movePath.length - 1
@@ -1400,7 +1385,7 @@ const Dashboard = () => {
                     closeMoveModal
                   }
                   disabled={moving}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -1414,7 +1399,7 @@ const Dashboard = () => {
                     moving ||
                     moveLoading
                   }
-                  className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
 
                   {moving ? (
@@ -1425,10 +1410,7 @@ const Dashboard = () => {
                     </>
                   ) : (
                     <>
-                      <Check
-                        size={16}
-                      />
-
+                      <Check size={16} />
                       Move here
                     </>
                   )}
