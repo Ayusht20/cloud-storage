@@ -2,28 +2,47 @@ import api from "./api";
 
 
 const folderService = {
-  getFolders(parentId = null) {
-    const endpoint = parentId
-      ? `/folders?parent_id=${encodeURIComponent(parentId)}`
-      : "/folders";
-
-    return api.get(endpoint);
+  getRootContents() {
+    return api.get("/folders/contents");
   },
 
 
-  getFolder(folderId) {
-    return api.get(`/folders/${folderId}`);
-  },
-
-
-  getContents(folderId) {
+  getFolderContents(folderId) {
     return api.get(
-      `/folders/${folderId}/contents`
+      `/folders/${encodeURIComponent(folderId)}/contents`
     );
   },
 
 
-  createFolder(name, parentId = null) {
+  getFolders(parentId = null) {
+    if (!parentId) {
+      return api.get("/folders");
+    }
+
+    return api.get(
+      `/folders/${encodeURIComponent(parentId)}`
+    );
+  },
+
+
+  getFolder(folderId) {
+    return api.get(
+      `/folders/${encodeURIComponent(folderId)}`
+    );
+  },
+
+
+  getBreadcrumbs(folderId) {
+    return api.get(
+      `/folders/${encodeURIComponent(folderId)}/breadcrumbs`
+    );
+  },
+
+
+  createFolder(
+    name,
+    parentId = null
+  ) {
     return api.post("/folders", {
       name,
       parent_id: parentId,
@@ -31,9 +50,12 @@ const folderService = {
   },
 
 
-  updateFolder(folderId, name) {
+  updateFolder(
+    folderId,
+    name
+  ) {
     return api.patch(
-      `/folders/${folderId}`,
+      `/folders/${encodeURIComponent(folderId)}`,
       {
         name,
       }
@@ -41,9 +63,22 @@ const folderService = {
   },
 
 
+  moveFolder(
+    folderId,
+    parentId = null
+  ) {
+    return api.patch(
+      `/folders/${encodeURIComponent(folderId)}/move`,
+      {
+        parent_id: parentId,
+      }
+    );
+  },
+
+
   deleteFolder(folderId) {
     return api.delete(
-      `/folders/${folderId}`
+      `/folders/${encodeURIComponent(folderId)}`
     );
   },
 };

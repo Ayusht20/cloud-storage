@@ -8,6 +8,9 @@ import {
   Upload,
   Folder,
   Files,
+  ChevronRight,
+  Home,
+  ArrowLeft,
 } from "lucide-react";
 
 import Layout from "../components/Layout";
@@ -19,14 +22,21 @@ import folderService from "../services/folderService";
 
 
 const Dashboard = () => {
-  const [files, setFiles] =
-    useState([]);
+  const [files, setFiles] = useState([]);
+  const [folders, setFolders] = useState([]);
 
-  const [folders, setFolders] =
-    useState([]);
+  const [currentFolder, setCurrentFolder] =
+    useState(null);
 
-  const [search, setSearch] =
-    useState("");
+  const [breadcrumbs, setBreadcrumbs] =
+    useState([
+      {
+        id: null,
+        name: "My Drive",
+      },
+    ]);
+
+  const [search, setSearch] = useState("");
 
   const [loading, setLoading] =
     useState(true);
@@ -35,60 +45,85 @@ const Dashboard = () => {
     useState("");
 
 
-  const loadFiles = async () => {
+  const loadRootContents = async () => {
+    setLoading(true);
+    setError("");
+
     try {
       const data =
-        await fileService.getFiles();
+        await folderService.getRootContents();
 
-      setFiles(
-        Array.isArray(data)
-          ? data
-          : data?.files || []
-      );
-    } catch (err) {
-      setError(
-        err.message ||
-          "Failed to load files"
-      );
-    }
-  };
-
-
-  const loadFolders = async () => {
-    try {
-      const data =
-        await folderService.getFolders();
+      setCurrentFolder(null);
 
       setFolders(
-        Array.isArray(data)
-          ? data
-          : data?.folders || []
+        data?.folders || []
+      );
+
+      setFiles(
+        data?.files || []
+      );
+
+      setBreadcrumbs(
+        data?.breadcrumbs || [
+          {
+            id: null,
+            name: "My Drive",
+          },
+        ]
       );
     } catch (err) {
       setError(
         err.message ||
-          "Failed to load folders"
+          "Failed to load your files"
       );
+    } finally {
+      setLoading(false);
     }
   };
 
 
-  const loadDashboard =
-    async () => {
+  const loadFolderContents =
+    async (folder) => {
       setLoading(true);
       setError("");
 
-      await Promise.all([
-        loadFiles(),
-        loadFolders(),
-      ]);
+      try {
+        const data =
+          await folderService.getFolderContents(
+            folder.id
+          );
 
-      setLoading(false);
+        setCurrentFolder(folder);
+
+        setFolders(
+          data?.folders || []
+        );
+
+        setFiles(
+          data?.files || []
+        );
+
+        const breadcrumbData =
+          await folderService.getBreadcrumbs(
+            folder.id
+          );
+
+        setBreadcrumbs(
+          breadcrumbData || []
+        );
+      } catch (err) {
+        setError(
+          err.message ||
+            "Failed to open folder"
+        );
+      } finally {
+        setLoading(false);
+      }
     };
 
 
   useEffect(() => {
-    loadDashboard();
+    loadRootContents();
   }, []);
 
 
@@ -105,10 +140,17 @@ const Dashboard = () => {
 
       try {
         await folderService.createFolder(
-          name.trim()
+          name.trim(),
+          currentFolder?.id || null
         );
 
-        await loadFolders();
+        if (currentFolder) {
+          await loadFolderContents(
+            currentFolder
+          );
+        } else {
+          await loadRootContents();
+        }
       } catch (err) {
         setError(
           err.message ||
@@ -134,13 +176,39 @@ const Dashboard = () => {
           file.id
         );
 
-        await loadFiles();
+        if (currentFolder) {
+          await loadFolderContents(
+            currentFolder
+          );
+        } else {
+          await loadRootContents();
+        }
       } catch (err) {
         setError(
           err.message ||
-            "Failed to delete file"
+            "Failed to move file to trash"
         );
       }
+    };
+
+
+  const handleFolderOpen =
+    (folder) => {
+      loadFolderContents(folder);
+    };
+
+
+  const handleBreadcrumbClick =
+    async (breadcrumb) => {
+      if (!breadcrumb.id) {
+        await loadRootContents();
+        return;
+      }
+
+      await loadFolderContents({
+        id: breadcrumb.id,
+        name: breadcrumb.name,
+      });
     };
 
 
@@ -173,7 +241,7 @@ const Dashboard = () => {
       <div className="mx-auto max-w-7xl">
 
         {/* Header */}
-        <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
 
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
@@ -211,8 +279,85 @@ const Dashboard = () => {
         </div>
 
 
+        {/* Breadcrumbs */}
+        <div className="mb-6 flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white px-4 py-3">
+
+          <Home
+            size={17}
+            className="shrink-0 text-slate-400"
+          />
+
+          {breadcrumbs.map(
+            (
+              breadcrumb,
+              index
+            ) => (
+              <div
+                key={
+                  breadcrumb.id ||
+                  "root"
+                }
+                className="flex shrink-0 items-center gap-2"
+              >
+
+                {index > 0 && (
+                  <ChevronRight
+                    size={16}
+                    className="text-slate-300"
+                  />
+                )}
+
+                <button
+                  onClick={() =>
+                    handleBreadcrumbClick(
+                      breadcrumb
+                    )
+                  }
+                  className={`text-sm font-medium transition ${
+                    index ===
+                    breadcrumbs.length -
+                      1
+                      ? "text-slate-900"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  {breadcrumb.name}
+                </button>
+
+              </div>
+            )
+          )}
+
+        </div>
+
+
+        {/* Back button */}
+        {currentFolder && (
+          <button
+            onClick={() => {
+              const parent =
+                breadcrumbs[
+                  breadcrumbs.length - 2
+                ];
+
+              if (!parent?.id) {
+                loadRootContents();
+              } else {
+                handleBreadcrumbClick(
+                  parent
+                );
+              }
+            }}
+            className="mb-6 flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900"
+          >
+            <ArrowLeft size={17} />
+            Back
+          </button>
+        )}
+
+
         {error && (
-          <div className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-600">
+          <div className="mb-6 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
             {error}
           </div>
         )}
@@ -220,9 +365,13 @@ const Dashboard = () => {
 
         {loading ? (
           <div className="flex min-h-64 items-center justify-center">
-            <p className="text-sm text-slate-400">
-              Loading your files...
-            </p>
+            <div className="text-center">
+              <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
+
+              <p className="text-sm text-slate-400">
+                Loading your files...
+              </p>
+            </div>
           </div>
         ) : (
           <>
@@ -230,15 +379,23 @@ const Dashboard = () => {
             {/* Folders */}
             <section className="mb-10">
 
-              <div className="mb-4 flex items-center gap-2">
-                <Folder
-                  size={20}
-                  className="text-slate-500"
-                />
+              <div className="mb-4 flex items-center justify-between">
 
-                <h2 className="font-semibold text-slate-800">
-                  Folders
-                </h2>
+                <div className="flex items-center gap-2">
+                  <Folder
+                    size={20}
+                    className="text-slate-500"
+                  />
+
+                  <h2 className="font-semibold text-slate-800">
+                    Folders
+                  </h2>
+                </div>
+
+                <span className="text-xs text-slate-400">
+                  {filteredFolders.length}
+                </span>
+
               </div>
 
 
@@ -251,11 +408,8 @@ const Dashboard = () => {
                       <FolderCard
                         key={folder.id}
                         folder={folder}
-                        onOpen={(item) =>
-                          console.log(
-                            "Open folder:",
-                            item
-                          )
+                        onOpen={
+                          handleFolderOpen
                         }
                       />
                     )
@@ -264,14 +418,20 @@ const Dashboard = () => {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+
                   <Folder
-                    size={32}
+                    size={36}
                     className="mx-auto mb-3 text-slate-300"
                   />
 
                   <p className="font-medium text-slate-600">
-                    No folders found
+                    No folders here
                   </p>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    Create a folder to organize your files.
+                  </p>
+
                 </div>
               )}
 
@@ -281,15 +441,23 @@ const Dashboard = () => {
             {/* Files */}
             <section>
 
-              <div className="mb-4 flex items-center gap-2">
-                <Files
-                  size={20}
-                  className="text-slate-500"
-                />
+              <div className="mb-4 flex items-center justify-between">
 
-                <h2 className="font-semibold text-slate-800">
-                  Files
-                </h2>
+                <div className="flex items-center gap-2">
+                  <Files
+                    size={20}
+                    className="text-slate-500"
+                  />
+
+                  <h2 className="font-semibold text-slate-800">
+                    Files
+                  </h2>
+                </div>
+
+                <span className="text-xs text-slate-400">
+                  {filteredFiles.length}
+                </span>
+
               </div>
 
 
@@ -312,14 +480,20 @@ const Dashboard = () => {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+
                   <Files
-                    size={32}
+                    size={36}
                     className="mx-auto mb-3 text-slate-300"
                   />
 
                   <p className="font-medium text-slate-600">
-                    No files found
+                    No files here
                   </p>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    Upload files to see them here.
+                  </p>
+
                 </div>
               )}
 
