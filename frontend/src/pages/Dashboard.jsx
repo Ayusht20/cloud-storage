@@ -25,7 +25,7 @@ import fileService from "../services/fileService";
 import folderService from "../services/folderService";
 
 
-const ROOT_BREADCRUMB = {
+const ROOT_FOLDER = {
   id: null,
   name: "My Drive",
 };
@@ -39,7 +39,7 @@ const Dashboard = () => {
     useState(null);
 
   const [breadcrumbs, setBreadcrumbs] =
-    useState([ROOT_BREADCRUMB]);
+    useState([ROOT_FOLDER]);
 
   const [search, setSearch] = useState("");
 
@@ -55,9 +55,10 @@ const Dashboard = () => {
   const fileInputRef = useRef(null);
 
 
-  /*
-   * Move modal state.
-   */
+  // ==================================================
+  // MOVE MODAL
+  // ==================================================
+
   const [moveModalOpen, setMoveModalOpen] =
     useState(false);
 
@@ -68,7 +69,7 @@ const Dashboard = () => {
     useState([]);
 
   const [movePath, setMovePath] =
-    useState([ROOT_BREADCRUMB]);
+    useState([ROOT_FOLDER]);
 
   const [moveLoading, setMoveLoading] =
     useState(false);
@@ -77,198 +78,143 @@ const Dashboard = () => {
     useState(false);
 
 
-  /*
-   * Normalize breadcrumb order.
-   */
-  const normalizeBreadcrumbs =
-    (items) => {
-      if (!Array.isArray(items)) {
-        return [ROOT_BREADCRUMB];
-      }
+  // ==================================================
+  // LOAD ROOT CONTENTS
+  // ==================================================
 
-      const cleaned = items
-        .filter(Boolean)
-        .map((item) => ({
-          id: item.id || null,
-          name:
-            item.name || "Unnamed folder",
-        }));
+  const loadRootContents = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data =
+        await folderService.getRootContents();
+
+      setCurrentFolder(null);
+
+      setFolders(
+        data?.folders || []
+      );
+
+      setFiles(
+        data?.files || []
+      );
+
+      setBreadcrumbs([
+        ROOT_FOLDER,
+      ]);
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to load your files"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
 
-      const withoutRoot =
-        cleaned.filter(
-          (item) => item.id !== null
+  // ==================================================
+  // LOAD FOLDER CONTENTS
+  //
+  // IMPORTANT:
+  // Only ONE API call.
+  //
+  // Breadcrumbs are handled locally.
+  // ==================================================
+
+  const loadFolderContents = async (
+    folder,
+    nextBreadcrumbs = null
+  ) => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data =
+        await folderService.getFolderContents(
+          folder.id
         );
 
+      setCurrentFolder(folder);
 
-      return [
-        ROOT_BREADCRUMB,
-        ...withoutRoot,
-      ];
-    };
+      setFolders(
+        data?.folders || []
+      );
 
-
-  /*
-   * Load root contents.
-   */
-  const loadRootContents =
-    async () => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const data =
-          await folderService.getRootContents();
-
-        setCurrentFolder(null);
-
-        setFolders(
-          data?.folders || []
-        );
-
-        setFiles(
-          data?.files || []
-        );
-
-        setBreadcrumbs([
-          ROOT_BREADCRUMB,
-        ]);
-      } catch (err) {
-        setError(
-          err.message ||
-            "Failed to load your files"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      setFiles(
+        data?.files || []
+      );
 
 
-  /*
-   * Load folder contents and breadcrumbs
-   * in parallel.
-   */
-  const loadFolderContents =
-    async (folder) => {
-      setLoading(true);
-      setError("");
-
-      try {
-        const [
-          data,
-          breadcrumbData,
-        ] = await Promise.all([
-          folderService.getFolderContents(
-            folder.id
-          ),
-
-          folderService.getBreadcrumbs(
-            folder.id
-          ),
-        ]);
-
-
-        setCurrentFolder(folder);
-
-        setFolders(
-          data?.folders || []
-        );
-
-        setFiles(
-          data?.files || []
-        );
-
-
-        let nextBreadcrumbs =
-          normalizeBreadcrumbs(
-            breadcrumbData
-          );
-
-
-        const currentIndex =
-          nextBreadcrumbs.findIndex(
-            (item) =>
-              item.id === folder.id
-          );
-
-
-        if (currentIndex !== -1) {
-          nextBreadcrumbs =
-            nextBreadcrumbs.slice(
-              0,
-              currentIndex + 1
-            );
-        } else {
-          nextBreadcrumbs = [
-            ...nextBreadcrumbs,
-            {
-              id: folder.id,
-              name: folder.name,
-            },
-          ];
-        }
-
-
+      if (nextBreadcrumbs) {
         setBreadcrumbs(
           nextBreadcrumbs
         );
-      } catch (err) {
-        setError(
-          err.message ||
-            "Failed to open folder"
-        );
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to open folder"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
+
+  // ==================================================
+  // INITIAL LOAD
+  // ==================================================
 
   useEffect(() => {
     loadRootContents();
   }, []);
 
 
-  /*
-   * Create folder.
-   */
-  const handleCreateFolder =
-    async () => {
-      const name =
-        window.prompt(
-          "Enter folder name"
-        );
+  // ==================================================
+  // CREATE FOLDER
+  // ==================================================
 
-      if (!name?.trim()) {
-        return;
+  const handleCreateFolder = async () => {
+    const name =
+      window.prompt(
+        "Enter folder name"
+      );
+
+    if (!name?.trim()) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      await folderService.createFolder(
+        name.trim(),
+        currentFolder?.id || null
+      );
+
+      if (currentFolder) {
+        await loadFolderContents(
+          currentFolder,
+          breadcrumbs
+        );
+      } else {
+        await loadRootContents();
       }
-
-      try {
-        setError("");
-
-        await folderService.createFolder(
-          name.trim(),
-          currentFolder?.id || null
-        );
-
-        if (currentFolder) {
-          await loadFolderContents(
-            currentFolder
-          );
-        } else {
-          await loadRootContents();
-        }
-      } catch (err) {
-        setError(
-          err.message ||
-            "Failed to create folder"
-        );
-      }
-    };
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to create folder"
+      );
+    }
+  };
 
 
-  /*
-   * Open upload picker.
-   */
+  // ==================================================
+  // UPLOAD
+  // ==================================================
+
   const handleUploadClick = () => {
     if (uploading) {
       return;
@@ -278,192 +224,361 @@ const Dashboard = () => {
   };
 
 
-  /*
-   * Upload file.
-   */
-  const handleFileUpload =
-    async (event) => {
-      const selectedFile =
-        event.target.files?.[0];
+  const handleFileUpload = async (
+    event
+  ) => {
+    const selectedFile =
+      event.target.files?.[0];
 
-      if (!selectedFile) {
+    if (!selectedFile) {
+      return;
+    }
+
+    setError("");
+    setUploading(true);
+
+    try {
+      await fileService.uploadFile(
+        selectedFile,
+        currentFolder?.id || null
+      );
+
+      if (currentFolder) {
+        await loadFolderContents(
+          currentFolder,
+          breadcrumbs
+        );
+      } else {
+        await loadRootContents();
+      }
+    } catch (err) {
+      setError(
+        err.message ||
+          "File upload failed"
+      );
+    } finally {
+      setUploading(false);
+
+      event.target.value = "";
+    }
+  };
+
+
+  // ==================================================
+  // DOWNLOAD
+  // ==================================================
+
+  const handleDownload = async (
+    file
+  ) => {
+    try {
+      setError("");
+
+      const data =
+        await fileService.downloadFile(
+          file.id
+        );
+
+      if (!data?.download_url) {
+        throw new Error(
+          "Download URL was not returned"
+        );
+      }
+
+      window.open(
+        data.download_url,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to download file"
+      );
+    }
+  };
+
+
+  // ==================================================
+  // RENAME
+  // ==================================================
+
+  const handleRename = async (
+    file
+  ) => {
+    const newName =
+      window.prompt(
+        "Enter new file name",
+        file.name
+      );
+
+    if (
+      !newName ||
+      !newName.trim() ||
+      newName.trim() === file.name
+    ) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      await fileService.renameFile(
+        file.id,
+        newName.trim()
+      );
+
+      if (currentFolder) {
+        await loadFolderContents(
+          currentFolder,
+          breadcrumbs
+        );
+      } else {
+        await loadRootContents();
+      }
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to rename file"
+      );
+    }
+  };
+
+
+  // ==================================================
+  // DELETE
+  // ==================================================
+
+  const handleDeleteFile = async (
+    file
+  ) => {
+    const confirmed =
+      window.confirm(
+        `Move "${file.name}" to trash?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      await fileService.deleteFile(
+        file.id
+      );
+
+      if (currentFolder) {
+        await loadFolderContents(
+          currentFolder,
+          breadcrumbs
+        );
+      } else {
+        await loadRootContents();
+      }
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to move file to trash"
+      );
+    }
+  };
+
+
+  // ==================================================
+  // OPEN FOLDER
+  // ==================================================
+
+  const handleFolderOpen = async (
+    folder
+  ) => {
+    const nextBreadcrumbs = [
+      ...breadcrumbs,
+      {
+        id: folder.id,
+        name: folder.name,
+      },
+    ];
+
+    await loadFolderContents(
+      folder,
+      nextBreadcrumbs
+    );
+  };
+
+
+  // ==================================================
+  // BREADCRUMB NAVIGATION
+  // ==================================================
+
+  const handleBreadcrumbClick =
+    async (
+      breadcrumb,
+      index
+    ) => {
+      // Root
+      if (
+        index === 0 ||
+        !breadcrumb.id
+      ) {
+        await loadRootContents();
         return;
       }
 
-      setError("");
-      setUploading(true);
 
-      try {
-        await fileService.uploadFile(
-          selectedFile,
-          currentFolder?.id || null
-        );
-
-        if (currentFolder) {
-          await loadFolderContents(
-            currentFolder
-          );
-        } else {
-          await loadRootContents();
-        }
-      } catch (err) {
-        setError(
-          err.message ||
-            "File upload failed"
-        );
-      } finally {
-        setUploading(false);
-
-        event.target.value = "";
-      }
-    };
-
-
-  /*
-   * Download file.
-   */
-  const handleDownload =
-    async (file) => {
-      try {
-        setError("");
-
-        const data =
-          await fileService.downloadFile(
-            file.id
-          );
-
-        if (!data?.download_url) {
-          throw new Error(
-            "Download URL was not returned"
-          );
-        }
-
-        window.open(
-          data.download_url,
-          "_blank",
-          "noopener,noreferrer"
-        );
-      } catch (err) {
-        setError(
-          err.message ||
-            "Failed to download file"
-        );
-      }
-    };
-
-
-  /*
-   * Rename file.
-   */
-  const handleRename =
-    async (file) => {
-      const newName =
-        window.prompt(
-          "Enter new file name",
-          file.name
-        );
-
+      // Already here
       if (
-        !newName ||
-        !newName.trim() ||
-        newName.trim() === file.name
+        currentFolder?.id ===
+        breadcrumb.id
       ) {
         return;
       }
 
-      try {
-        setError("");
 
-        await fileService.renameFile(
-          file.id,
-          newName.trim()
+      const nextBreadcrumbs =
+        breadcrumbs.slice(
+          0,
+          index + 1
         );
 
-        if (currentFolder) {
-          await loadFolderContents(
-            currentFolder
-          );
-        } else {
-          await loadRootContents();
-        }
-      } catch (err) {
-        setError(
-          err.message ||
-            "Failed to rename file"
-        );
-      }
+
+      await loadFolderContents(
+        {
+          id: breadcrumb.id,
+          name: breadcrumb.name,
+        },
+        nextBreadcrumbs
+      );
     };
 
 
-  /*
-   * Open the move modal.
-   */
-  const handleMove =
-    async (file) => {
-      setError("");
+  // ==================================================
+  // BACK
+  // ==================================================
 
-      setFileToMove(file);
-
-      setMovePath([
-        ROOT_BREADCRUMB,
-      ]);
-
-      setMoveModalOpen(true);
-
-      await loadMoveFolders(null);
-    };
+  const handleBack = async () => {
+    // Already root
+    if (
+      breadcrumbs.length <= 1
+    ) {
+      await loadRootContents();
+      return;
+    }
 
 
-  /*
-   * Load folders for the current
-   * location inside the move picker.
-   *
-   * null = My Drive/root
-   */
-  const loadMoveFolders =
-    async (folderId) => {
-      setMoveLoading(true);
+    const nextBreadcrumbs =
+      breadcrumbs.slice(
+        0,
+        -1
+      );
 
-      try {
-        const data =
-          folderId === null
-            ? await folderService.getFolders()
-            : await folderService.getFolders(
-                folderId
-              );
 
-        setMoveFolders(
-          Array.isArray(data)
-            ? data
-            : data?.folders || []
+    const parent =
+      nextBreadcrumbs[
+        nextBreadcrumbs.length - 1
+      ];
+
+
+    // Parent is root
+    if (!parent.id) {
+      await loadRootContents();
+      return;
+    }
+
+
+    await loadFolderContents(
+      {
+        id: parent.id,
+        name: parent.name,
+      },
+      nextBreadcrumbs
+    );
+  };
+
+
+  // ==================================================
+  // MOVE MODAL
+  // ==================================================
+
+  const loadMoveFolders = async (
+    parentId = null
+  ) => {
+    setMoveLoading(true);
+
+    try {
+      const data =
+        await folderService.getFolders(
+          parentId
         );
-      } catch (err) {
-        setError(
-          err.message ||
-            "Failed to load folders"
-        );
 
-        setMoveFolders([]);
-      } finally {
-        setMoveLoading(false);
-      }
-    };
+      /*
+       * Backend may return:
+       *
+       * [...]
+       *
+       * OR
+       *
+       * { folders: [...] }
+       */
+
+      const folderList =
+        Array.isArray(data)
+          ? data
+          : data?.folders || [];
+
+      setMoveFolders(
+        folderList
+      );
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to load folders"
+      );
+
+      setMoveFolders([]);
+    } finally {
+      setMoveLoading(false);
+    }
+  };
 
 
-  /*
-   * Enter a folder inside the
-   * move picker.
-   */
+  // ==================================================
+  // OPEN MOVE MODAL
+  // ==================================================
+
+  const handleMove = async (
+    file
+  ) => {
+    setError("");
+
+    setFileToMove(file);
+
+    setMovePath([
+      ROOT_FOLDER,
+    ]);
+
+    setMoveModalOpen(true);
+
+    await loadMoveFolders(null);
+  };
+
+
+  // ==================================================
+  // OPEN FOLDER INSIDE MOVE MODAL
+  // ==================================================
+
   const handleMoveFolderOpen =
     async (folder) => {
+      const nextPath = [
+        ...movePath,
+        {
+          id: folder.id,
+          name: folder.name,
+        },
+      ];
+
       setMovePath(
-        (previous) => [
-          ...previous,
-          {
-            id: folder.id,
-            name: folder.name,
-          },
-        ]
+        nextPath
       );
 
       await loadMoveFolders(
@@ -472,19 +587,24 @@ const Dashboard = () => {
     };
 
 
-  /*
-   * Navigate to a location inside
-   * the move picker.
-   */
+  // ==================================================
+  // MOVE MODAL BREADCRUMB
+  // ==================================================
+
   const handleMoveBreadcrumb =
-    async (breadcrumb, index) => {
+    async (
+      breadcrumb,
+      index
+    ) => {
       const nextPath =
         movePath.slice(
           0,
           index + 1
         );
 
-      setMovePath(nextPath);
+      setMovePath(
+        nextPath
+      );
 
       await loadMoveFolders(
         breadcrumb.id || null
@@ -492,10 +612,10 @@ const Dashboard = () => {
     };
 
 
-  /*
-   * Go one level back inside the
-   * move picker.
-   */
+  // ==================================================
+  // MOVE MODAL BACK
+  // ==================================================
+
   const handleMoveBack =
     async () => {
       if (
@@ -510,12 +630,14 @@ const Dashboard = () => {
           -1
         );
 
+      setMovePath(
+        nextPath
+      );
+
       const parent =
         nextPath[
           nextPath.length - 1
         ];
-
-      setMovePath(nextPath);
 
       await loadMoveFolders(
         parent.id || null
@@ -523,9 +645,10 @@ const Dashboard = () => {
     };
 
 
-  /*
-   * Close move modal.
-   */
+  // ==================================================
+  // CLOSE MOVE MODAL
+  // ==================================================
+
   const closeMoveModal = () => {
     if (moving) {
       return;
@@ -538,20 +661,21 @@ const Dashboard = () => {
     setMoveFolders([]);
 
     setMovePath([
-      ROOT_BREADCRUMB,
+      ROOT_FOLDER,
     ]);
   };
 
 
-  /*
-   * Move the selected file into
-   * the currently selected folder.
-   */
+  // ==================================================
+  // CONFIRM MOVE
+  // ==================================================
+
   const handleConfirmMove =
     async () => {
       if (!fileToMove) {
         return;
       }
+
 
       const destination =
         movePath[
@@ -560,10 +684,10 @@ const Dashboard = () => {
 
 
       /*
-       * If the selected destination
-       * is already the current folder,
-       * there is nothing to do.
+       * Prevent moving a file into
+       * the folder it already belongs to.
        */
+
       if (
         destination.id ===
         (currentFolder?.id || null)
@@ -580,6 +704,15 @@ const Dashboard = () => {
       setError("");
 
       try {
+        /*
+         * IMPORTANT:
+         *
+         * destination.id is the REAL
+         * folder UUID.
+         *
+         * Root = null.
+         */
+
         await fileService.moveFile(
           fileToMove.id,
           destination.id || null
@@ -590,12 +723,13 @@ const Dashboard = () => {
 
 
         /*
-         * Refresh the current location
-         * after moving the file.
+         * Refresh only current location.
          */
+
         if (currentFolder) {
           await loadFolderContents(
-            currentFolder
+            currentFolder,
+            breadcrumbs
           );
         } else {
           await loadRootContents();
@@ -611,116 +745,9 @@ const Dashboard = () => {
     };
 
 
-  /*
-   * Delete file.
-   */
-  const handleDeleteFile =
-    async (file) => {
-      const confirmed =
-        window.confirm(
-          `Move "${file.name}" to trash?`
-        );
-
-      if (!confirmed) {
-        return;
-      }
-
-      try {
-        setError("");
-
-        await fileService.deleteFile(
-          file.id
-        );
-
-        if (currentFolder) {
-          await loadFolderContents(
-            currentFolder
-          );
-        } else {
-          await loadRootContents();
-        }
-      } catch (err) {
-        setError(
-          err.message ||
-            "Failed to move file to trash"
-        );
-      }
-    };
-
-
-  /*
-   * Open folder.
-   */
-  const handleFolderOpen =
-    async (folder) => {
-      await loadFolderContents(
-        folder
-      );
-    };
-
-
-  /*
-   * Breadcrumb navigation.
-   */
-  const handleBreadcrumbClick =
-    async (
-      breadcrumb,
-      index
-    ) => {
-      if (
-        !breadcrumb.id ||
-        index === 0
-      ) {
-        await loadRootContents();
-        return;
-      }
-
-      if (
-        currentFolder?.id ===
-        breadcrumb.id
-      ) {
-        return;
-      }
-
-      await loadFolderContents({
-        id: breadcrumb.id,
-        name: breadcrumb.name,
-      });
-    };
-
-
-  /*
-   * Back one folder.
-   */
-  const handleBack =
-    async () => {
-      if (
-        !currentFolder ||
-        breadcrumbs.length <= 1
-      ) {
-        await loadRootContents();
-        return;
-      }
-
-      const parentIndex =
-        breadcrumbs.length - 2;
-
-      const parent =
-        breadcrumbs[parentIndex];
-
-
-      if (!parent?.id) {
-        await loadRootContents();
-        return;
-      }
-
-
-      await loadFolderContents({
-        id: parent.id,
-        name: parent.name,
-      });
-    };
-
+  // ==================================================
+  // SEARCH
+  // ==================================================
 
   const filteredFolders =
     folders.filter((folder) =>
@@ -742,6 +769,10 @@ const Dashboard = () => {
     );
 
 
+  // ==================================================
+  // UI
+  // ==================================================
+
   return (
     <Layout
       search={search}
@@ -750,10 +781,15 @@ const Dashboard = () => {
 
       <div className="mx-auto max-w-7xl">
 
-        {/* Header */}
+
+        {/* ==========================================
+            HEADER
+            ========================================== */}
+
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
 
           <div>
+
             <h1 className="text-2xl font-bold text-slate-900">
               My Files
             </h1>
@@ -761,6 +797,7 @@ const Dashboard = () => {
             <p className="mt-1 text-sm text-slate-500">
               Manage your files and folders
             </p>
+
           </div>
 
 
@@ -773,7 +810,10 @@ const Dashboard = () => {
               disabled={uploading}
               className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <FolderPlus size={18} />
+              <FolderPlus
+                size={18}
+              />
+
               New folder
             </button>
 
@@ -785,7 +825,9 @@ const Dashboard = () => {
               disabled={uploading}
               className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Upload size={18} />
+              <Upload
+                size={18}
+              />
 
               {uploading
                 ? "Uploading..."
@@ -807,13 +849,17 @@ const Dashboard = () => {
         </div>
 
 
-        {/* Breadcrumbs */}
+        {/* ==========================================
+            BREADCRUMBS
+            ========================================== */}
+
         <div className="mb-4 flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white px-4 py-3">
 
           <Home
             size={17}
             className="shrink-0 text-slate-400"
           />
+
 
           {breadcrumbs.map(
             (
@@ -835,6 +881,7 @@ const Dashboard = () => {
                   />
                 )}
 
+
                 <button
                   onClick={() =>
                     handleBreadcrumbClick(
@@ -853,7 +900,9 @@ const Dashboard = () => {
                       : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  {breadcrumb.name}
+                  {
+                    breadcrumb.name
+                  }
                 </button>
 
               </div>
@@ -863,7 +912,10 @@ const Dashboard = () => {
         </div>
 
 
-        {/* Back */}
+        {/* ==========================================
+            BACK
+            ========================================== */}
+
         {currentFolder && (
           <button
             onClick={
@@ -872,13 +924,21 @@ const Dashboard = () => {
             disabled={loading}
             className="mb-6 flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <ArrowLeft size={17} />
+
+            <ArrowLeft
+              size={17}
+            />
+
             Back
+
           </button>
         )}
 
 
-        {/* Error */}
+        {/* ==========================================
+            ERROR
+            ========================================== */}
+
         {error && (
           <div className="mb-6 flex items-center justify-between rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
 
@@ -899,7 +959,10 @@ const Dashboard = () => {
         )}
 
 
-        {/* Loading */}
+        {/* ==========================================
+            LOADING
+            ========================================== */}
+
         {loading ? (
           <div className="flex min-h-64 items-center justify-center">
 
@@ -917,7 +980,11 @@ const Dashboard = () => {
         ) : (
           <>
 
-            {/* Folders */}
+
+            {/* ========================================
+                FOLDERS
+                ======================================== */}
+
             <section className="mb-10">
 
               <div className="mb-4 flex items-center justify-between">
@@ -935,8 +1002,11 @@ const Dashboard = () => {
 
                 </div>
 
+
                 <span className="text-xs text-slate-400">
-                  {filteredFolders.length}
+                  {
+                    filteredFolders.length
+                  }
                 </span>
 
               </div>
@@ -949,8 +1019,12 @@ const Dashboard = () => {
                   {filteredFolders.map(
                     (folder) => (
                       <FolderCard
-                        key={folder.id}
-                        folder={folder}
+                        key={
+                          folder.id
+                        }
+                        folder={
+                          folder
+                        }
                         onOpen={
                           handleFolderOpen
                         }
@@ -981,7 +1055,10 @@ const Dashboard = () => {
             </section>
 
 
-            {/* Files */}
+            {/* ========================================
+                FILES
+                ======================================== */}
+
             <section>
 
               <div className="mb-4 flex items-center justify-between">
@@ -999,8 +1076,11 @@ const Dashboard = () => {
 
                 </div>
 
+
                 <span className="text-xs text-slate-400">
-                  {filteredFiles.length}
+                  {
+                    filteredFiles.length
+                  }
                 </span>
 
               </div>
@@ -1013,8 +1093,12 @@ const Dashboard = () => {
                   {filteredFiles.map(
                     (file) => (
                       <FileCard
-                        key={file.id}
-                        file={file}
+                        key={
+                          file.id
+                        }
+                        file={
+                          file
+                        }
                         onDownload={
                           handleDownload
                         }
@@ -1059,19 +1143,24 @@ const Dashboard = () => {
       </div>
 
 
-      {/* =====================================================
+      {/* ==================================================
           MOVE FILE MODAL
-          ===================================================== */}
+          ================================================== */}
 
       {moveModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
 
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
 
-            {/* Modal header */}
+
+            {/* ------------------------------------------
+                HEADER
+                ------------------------------------------ */}
+
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
 
-              <div>
+              <div className="min-w-0">
+
                 <h2 className="font-semibold text-slate-900">
                   Move file
                 </h2>
@@ -1082,8 +1171,11 @@ const Dashboard = () => {
                     fileToMove?.name
                   }
                 >
-                  {fileToMove?.name}
+                  {
+                    fileToMove?.name
+                  }
                 </p>
+
               </div>
 
 
@@ -1094,13 +1186,18 @@ const Dashboard = () => {
                 disabled={moving}
                 className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
               >
-                <X size={19} />
+                <X
+                  size={19}
+                />
               </button>
 
             </div>
 
 
-            {/* Current destination */}
+            {/* ------------------------------------------
+                MOVE BREADCRUMBS
+                ------------------------------------------ */}
+
             <div className="border-b border-slate-100 px-5 py-3">
 
               <div className="flex items-center gap-1 overflow-x-auto">
@@ -1144,7 +1241,9 @@ const Dashboard = () => {
                             : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                         }`}
                       >
-                        {breadcrumb.name}
+                        {
+                          breadcrumb.name
+                        }
                       </button>
 
                     </div>
@@ -1156,7 +1255,10 @@ const Dashboard = () => {
             </div>
 
 
-            {/* Folder list */}
+            {/* ------------------------------------------
+                FOLDER LIST
+                ------------------------------------------ */}
+
             <div className="max-h-80 overflow-y-auto p-3">
 
               {moveLoading ? (
@@ -1179,9 +1281,11 @@ const Dashboard = () => {
 
                   {moveFolders.map(
                     (folder) => {
+
                       const isCurrent =
                         folder.id ===
                         currentFolder?.id;
+
 
                       return (
                         <button
@@ -1194,11 +1298,12 @@ const Dashboard = () => {
                             )
                           }
                           disabled={
-                            moving
+                            moving ||
+                            isCurrent
                           }
                           className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition ${
                             isCurrent
-                              ? "bg-slate-50 opacity-50"
+                              ? "cursor-not-allowed bg-slate-50 opacity-50"
                               : "hover:bg-slate-50"
                           }`}
                         >
@@ -1215,7 +1320,9 @@ const Dashboard = () => {
 
 
                             <span className="truncate text-sm font-medium text-slate-700">
-                              {folder.name}
+                              {
+                                folder.name
+                              }
                             </span>
 
                           </div>
@@ -1254,7 +1361,10 @@ const Dashboard = () => {
             </div>
 
 
-            {/* Modal footer */}
+            {/* ------------------------------------------
+                FOOTER
+                ------------------------------------------ */}
+
             <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4">
 
               <div className="min-w-0">
@@ -1293,8 +1403,7 @@ const Dashboard = () => {
                   }
                   disabled={
                     moving ||
-                    moveLoading ||
-                    movePath.length === 0
+                    moveLoading
                   }
                   className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -1302,11 +1411,15 @@ const Dashboard = () => {
                   {moving ? (
                     <>
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-white" />
+
                       Moving...
                     </>
                   ) : (
                     <>
-                      <Check size={16} />
+                      <Check
+                        size={16}
+                      />
+
                       Move here
                     </>
                   )}

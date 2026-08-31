@@ -2,26 +2,46 @@ import api from "./api";
 
 
 const fileService = {
-  getFiles(folderId = null) {
-    const endpoint = folderId
-      ? `/files?folder_id=${encodeURIComponent(folderId)}`
-      : "/files";
+  // -----------------------------------------------
+  // Get files
+  // -----------------------------------------------
 
-    return api.get(endpoint);
+  getFiles(folderId = null) {
+    if (!folderId) {
+      return api.get("/files");
+    }
+
+    return api.get(
+      `/files?folder_id=${encodeURIComponent(
+        folderId
+      )}`
+    );
   },
 
 
-  uploadFile(file, folderId = null) {
-    const formData = new FormData();
+  // -----------------------------------------------
+  // Upload
+  // -----------------------------------------------
+
+  uploadFile(
+    file,
+    folderId = null
+  ) {
+    const formData =
+      new FormData();
 
     formData.append(
       "uploaded_file",
       file
     );
 
+
     const endpoint = folderId
-      ? `/files/upload?folder_id=${encodeURIComponent(folderId)}`
+      ? `/files/upload?folder_id=${encodeURIComponent(
+          folderId
+        )}`
       : "/files/upload";
+
 
     return api.post(
       endpoint,
@@ -30,26 +50,44 @@ const fileService = {
   },
 
 
+  // -----------------------------------------------
+  // Get single file
+  // -----------------------------------------------
+
   getFile(fileId) {
     return api.get(
-      `/files/${encodeURIComponent(fileId)}`
+      `/files/${encodeURIComponent(
+        fileId
+      )}`
     );
   },
 
+
+  // -----------------------------------------------
+  // Download
+  // -----------------------------------------------
 
   downloadFile(fileId) {
     return api.get(
-      `/files/${encodeURIComponent(fileId)}/download`
+      `/files/${encodeURIComponent(
+        fileId
+      )}/download`
     );
   },
 
+
+  // -----------------------------------------------
+  // Rename
+  // -----------------------------------------------
 
   renameFile(
     fileId,
     name
   ) {
     return api.patch(
-      `/files/${encodeURIComponent(fileId)}`,
+      `/files/${encodeURIComponent(
+        fileId
+      )}`,
       {
         name,
       }
@@ -57,12 +95,20 @@ const fileService = {
   },
 
 
+  // -----------------------------------------------
+  // Move
+  // folderId MUST be the actual UUID.
+  // null = My Drive / root.
+  // -----------------------------------------------
+
   moveFile(
     fileId,
     folderId = null
   ) {
     return api.patch(
-      `/files/${encodeURIComponent(fileId)}/move`,
+      `/files/${encodeURIComponent(
+        fileId
+      )}/move`,
       {
         folder_id: folderId,
       }
@@ -70,9 +116,15 @@ const fileService = {
   },
 
 
+  // -----------------------------------------------
+  // Move to trash
+  // -----------------------------------------------
+
   deleteFile(fileId) {
     return api.delete(
-      `/files/${encodeURIComponent(fileId)}`
+      `/files/${encodeURIComponent(
+        fileId
+      )}`
     );
   },
 };
