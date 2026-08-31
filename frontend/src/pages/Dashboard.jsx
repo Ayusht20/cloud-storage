@@ -22,6 +22,12 @@ import fileService from "../services/fileService";
 import folderService from "../services/folderService";
 
 
+const ROOT_BREADCRUMB = {
+  id: null,
+  name: "My Drive",
+};
+
+
 const Dashboard = () => {
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -30,12 +36,7 @@ const Dashboard = () => {
     useState(null);
 
   const [breadcrumbs, setBreadcrumbs] =
-    useState([
-      {
-        id: null,
-        name: "My Drive",
-      },
-    ]);
+    useState([ROOT_BREADCRUMB]);
 
   const [search, setSearch] = useState("");
 
@@ -52,7 +53,52 @@ const Dashboard = () => {
 
 
   /*
-   * Load root folder contents.
+   * Make sure breadcrumbs always follow:
+   *
+   * My Drive
+   *    ↓
+   * Parent
+   *    ↓
+   * Current folder
+   *
+   * This also protects the UI if the
+   * backend returns the breadcrumb
+   * chain in the opposite direction.
+   */
+  const normalizeBreadcrumbs =
+    (items) => {
+      if (!Array.isArray(items)) {
+        return [ROOT_BREADCRUMB];
+      }
+
+      const cleaned = items
+        .filter(Boolean)
+        .map((item) => ({
+          id: item.id || null,
+          name:
+            item.name || "Unnamed folder",
+        }));
+
+
+      /*
+       * Make sure My Drive exists
+       * exactly once at the beginning.
+       */
+      const withoutRoot =
+        cleaned.filter(
+          (item) => item.id !== null
+        );
+
+
+      return [
+        ROOT_BREADCRUMB,
+        ...withoutRoot,
+      ];
+    };
+
+
+  /*
+   * Load root contents.
    */
   const loadRootContents =
     async () => {
@@ -73,14 +119,9 @@ const Dashboard = () => {
           data?.files || []
         );
 
-        setBreadcrumbs(
-          data?.breadcrumbs || [
-            {
-              id: null,
-              name: "My Drive",
-            },
-          ]
-        );
+        setBreadcrumbs([
+          ROOT_BREADCRUMB,
+        ]);
       } catch (err) {
         setError(
           err.message ||
@@ -94,7 +135,7 @@ const Dashboard = () => {
 
   /*
    * Load a folder and its breadcrumbs
-   * at the same time.
+   * in parallel.
    */
   const loadFolderContents =
     async (folder) => {
@@ -115,6 +156,7 @@ const Dashboard = () => {
           ),
         ]);
 
+
         setCurrentFolder(folder);
 
         setFolders(
@@ -125,8 +167,43 @@ const Dashboard = () => {
           data?.files || []
         );
 
+
+        let nextBreadcrumbs =
+          normalizeBreadcrumbs(
+            breadcrumbData
+          );
+
+
+        /*
+         * Ensure the current folder
+         * is the final breadcrumb.
+         */
+        const currentIndex =
+          nextBreadcrumbs.findIndex(
+            (item) =>
+              item.id === folder.id
+          );
+
+
+        if (currentIndex !== -1) {
+          nextBreadcrumbs =
+            nextBreadcrumbs.slice(
+              0,
+              currentIndex + 1
+            );
+        } else {
+          nextBreadcrumbs = [
+            ...nextBreadcrumbs,
+            {
+              id: folder.id,
+              name: folder.name,
+            },
+          ];
+        }
+
+
         setBreadcrumbs(
-          breadcrumbData || []
+          nextBreadcrumbs
         );
       } catch (err) {
         setError(
@@ -140,8 +217,7 @@ const Dashboard = () => {
 
 
   /*
-   * Load the dashboard when the
-   * component is mounted.
+   * Initial dashboard load.
    */
   useEffect(() => {
     loadRootContents();
@@ -149,8 +225,7 @@ const Dashboard = () => {
 
 
   /*
-   * Create a new folder inside
-   * the current folder.
+   * Create folder.
    */
   const handleCreateFolder =
     async () => {
@@ -164,6 +239,8 @@ const Dashboard = () => {
       }
 
       try {
+        setError("");
+
         await folderService.createFolder(
           name.trim(),
           currentFolder?.id || null
@@ -186,7 +263,7 @@ const Dashboard = () => {
 
 
   /*
-   * Open the hidden file picker.
+   * Open file picker.
    */
   const handleUploadClick = () => {
     if (uploading) {
@@ -198,7 +275,7 @@ const Dashboard = () => {
 
 
   /*
-   * Upload the selected file.
+   * Upload file.
    */
   const handleFileUpload =
     async (event) => {
@@ -218,11 +295,6 @@ const Dashboard = () => {
           currentFolder?.id || null
         );
 
-        /*
-         * Refresh the current location
-         * so the uploaded file appears
-         * immediately.
-         */
         if (currentFolder) {
           await loadFolderContents(
             currentFolder
@@ -238,17 +310,13 @@ const Dashboard = () => {
       } finally {
         setUploading(false);
 
-        /*
-         * Reset the input so the same
-         * file can be selected again.
-         */
         event.target.value = "";
       }
     };
 
 
   /*
-   * Download a file.
+   * Download file.
    */
   const handleDownload =
     async (file) => {
@@ -281,7 +349,7 @@ const Dashboard = () => {
 
 
   /*
-   * Rename a file.
+   * Rename file.
    */
   const handleRename =
     async (file) => {
@@ -324,11 +392,7 @@ const Dashboard = () => {
 
 
   /*
-   * Move a file to another folder.
-   *
-   * This is temporarily using a
-   * folder UUID prompt. We will replace
-   * this with a proper folder picker UI.
+   * Move file.
    */
   const handleMove =
     async (file) => {
@@ -369,7 +433,7 @@ const Dashboard = () => {
 
 
   /*
-   * Move a file to trash.
+   * Delete file.
    */
   const handleDeleteFile =
     async (file) => {
@@ -406,23 +470,44 @@ const Dashboard = () => {
 
 
   /*
-   * Open a folder.
+   * Open folder.
    */
   const handleFolderOpen =
-    (folder) => {
-      loadFolderContents(folder);
+    async (folder) => {
+      await loadFolderContents(
+        folder
+      );
     };
 
 
   /*
-   * Navigate through breadcrumbs.
+   * Navigate to a breadcrumb.
    */
   const handleBreadcrumbClick =
-    async (breadcrumb) => {
-      if (!breadcrumb.id) {
+    async (breadcrumb, index) => {
+      /*
+       * Root breadcrumb.
+       */
+      if (
+        !breadcrumb.id ||
+        index === 0
+      ) {
         await loadRootContents();
         return;
       }
+
+
+      /*
+       * If the breadcrumb is already
+       * the current folder, do nothing.
+       */
+      if (
+        currentFolder?.id ===
+        breadcrumb.id
+      ) {
+        return;
+      }
+
 
       await loadFolderContents({
         id: breadcrumb.id,
@@ -432,8 +517,56 @@ const Dashboard = () => {
 
 
   /*
-   * Filter folders using the
-   * dashboard search box.
+   * Go exactly one level backward.
+   */
+  const handleBack = async () => {
+    /*
+     * Already at root.
+     */
+    if (
+      !currentFolder ||
+      breadcrumbs.length <= 1
+    ) {
+      await loadRootContents();
+      return;
+    }
+
+
+    /*
+     * Current folder is the last
+     * breadcrumb.
+     *
+     * Parent is therefore the item
+     * immediately before it.
+     */
+    const parentIndex =
+      breadcrumbs.length - 2;
+
+    const parent =
+      breadcrumbs[parentIndex];
+
+
+    /*
+     * Parent is My Drive.
+     */
+    if (!parent?.id) {
+      await loadRootContents();
+      return;
+    }
+
+
+    /*
+     * Open parent folder.
+     */
+    await loadFolderContents({
+      id: parent.id,
+      name: parent.name,
+    });
+  };
+
+
+  /*
+   * Search folders.
    */
   const filteredFolders =
     folders.filter((folder) =>
@@ -446,8 +579,7 @@ const Dashboard = () => {
 
 
   /*
-   * Filter files using the
-   * dashboard search box.
+   * Search files.
    */
   const filteredFiles =
     files.filter((file) =>
@@ -524,13 +656,14 @@ const Dashboard = () => {
         </div>
 
 
-        {/* Breadcrumbs */}
-        <div className="mb-6 flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white px-4 py-3">
+        {/* Breadcrumb navigation */}
+        <div className="mb-4 flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white px-4 py-3">
 
           <Home
             size={17}
             className="shrink-0 text-slate-400"
           />
+
 
           {breadcrumbs.map(
             (
@@ -552,17 +685,22 @@ const Dashboard = () => {
                   />
                 )}
 
+
                 <button
                   onClick={() =>
                     handleBreadcrumbClick(
-                      breadcrumb
+                      breadcrumb,
+                      index
                     )
+                  }
+                  disabled={
+                    index ===
+                    breadcrumbs.length - 1
                   }
                   className={`text-sm font-medium transition ${
                     index ===
-                    breadcrumbs.length -
-                      1
-                      ? "text-slate-900"
+                    breadcrumbs.length - 1
+                      ? "cursor-default text-slate-900"
                       : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
@@ -579,21 +717,9 @@ const Dashboard = () => {
         {/* Back button */}
         {currentFolder && (
           <button
-            onClick={() => {
-              const parent =
-                breadcrumbs[
-                  breadcrumbs.length - 2
-                ];
-
-              if (!parent?.id) {
-                loadRootContents();
-              } else {
-                handleBreadcrumbClick(
-                  parent
-                );
-              }
-            }}
-            className="mb-6 flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900"
+            onClick={handleBack}
+            disabled={loading}
+            className="mb-6 flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ArrowLeft size={17} />
             Back
