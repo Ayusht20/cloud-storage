@@ -12,6 +12,9 @@ import {
   ChevronRight,
   Home,
   ArrowLeft,
+  X,
+  Check,
+  FolderOpen,
 } from "lucide-react";
 
 import Layout from "../components/Layout";
@@ -53,17 +56,29 @@ const Dashboard = () => {
 
 
   /*
-   * Make sure breadcrumbs always follow:
-   *
-   * My Drive
-   *    ↓
-   * Parent
-   *    ↓
-   * Current folder
-   *
-   * This also protects the UI if the
-   * backend returns the breadcrumb
-   * chain in the opposite direction.
+   * Move modal state.
+   */
+  const [moveModalOpen, setMoveModalOpen] =
+    useState(false);
+
+  const [fileToMove, setFileToMove] =
+    useState(null);
+
+  const [moveFolders, setMoveFolders] =
+    useState([]);
+
+  const [movePath, setMovePath] =
+    useState([ROOT_BREADCRUMB]);
+
+  const [moveLoading, setMoveLoading] =
+    useState(false);
+
+  const [moving, setMoving] =
+    useState(false);
+
+
+  /*
+   * Normalize breadcrumb order.
    */
   const normalizeBreadcrumbs =
     (items) => {
@@ -80,10 +95,6 @@ const Dashboard = () => {
         }));
 
 
-      /*
-       * Make sure My Drive exists
-       * exactly once at the beginning.
-       */
       const withoutRoot =
         cleaned.filter(
           (item) => item.id !== null
@@ -134,7 +145,7 @@ const Dashboard = () => {
 
 
   /*
-   * Load a folder and its breadcrumbs
+   * Load folder contents and breadcrumbs
    * in parallel.
    */
   const loadFolderContents =
@@ -174,10 +185,6 @@ const Dashboard = () => {
           );
 
 
-        /*
-         * Ensure the current folder
-         * is the final breadcrumb.
-         */
         const currentIndex =
           nextBreadcrumbs.findIndex(
             (item) =>
@@ -216,9 +223,6 @@ const Dashboard = () => {
     };
 
 
-  /*
-   * Initial dashboard load.
-   */
   useEffect(() => {
     loadRootContents();
   }, []);
@@ -263,7 +267,7 @@ const Dashboard = () => {
 
 
   /*
-   * Open file picker.
+   * Open upload picker.
    */
   const handleUploadClick = () => {
     if (uploading) {
@@ -392,30 +396,203 @@ const Dashboard = () => {
 
 
   /*
-   * Move file.
+   * Open the move modal.
    */
   const handleMove =
     async (file) => {
-      const folderId =
-        window.prompt(
-          "Enter destination folder ID. Leave empty to move to My Drive."
+      setError("");
+
+      setFileToMove(file);
+
+      setMovePath([
+        ROOT_BREADCRUMB,
+      ]);
+
+      setMoveModalOpen(true);
+
+      await loadMoveFolders(null);
+    };
+
+
+  /*
+   * Load folders for the current
+   * location inside the move picker.
+   *
+   * null = My Drive/root
+   */
+  const loadMoveFolders =
+    async (folderId) => {
+      setMoveLoading(true);
+
+      try {
+        const data =
+          folderId === null
+            ? await folderService.getFolders()
+            : await folderService.getFolders(
+                folderId
+              );
+
+        setMoveFolders(
+          Array.isArray(data)
+            ? data
+            : data?.folders || []
+        );
+      } catch (err) {
+        setError(
+          err.message ||
+            "Failed to load folders"
         );
 
-      if (folderId === null) {
+        setMoveFolders([]);
+      } finally {
+        setMoveLoading(false);
+      }
+    };
+
+
+  /*
+   * Enter a folder inside the
+   * move picker.
+   */
+  const handleMoveFolderOpen =
+    async (folder) => {
+      setMovePath(
+        (previous) => [
+          ...previous,
+          {
+            id: folder.id,
+            name: folder.name,
+          },
+        ]
+      );
+
+      await loadMoveFolders(
+        folder.id
+      );
+    };
+
+
+  /*
+   * Navigate to a location inside
+   * the move picker.
+   */
+  const handleMoveBreadcrumb =
+    async (breadcrumb, index) => {
+      const nextPath =
+        movePath.slice(
+          0,
+          index + 1
+        );
+
+      setMovePath(nextPath);
+
+      await loadMoveFolders(
+        breadcrumb.id || null
+      );
+    };
+
+
+  /*
+   * Go one level back inside the
+   * move picker.
+   */
+  const handleMoveBack =
+    async () => {
+      if (
+        movePath.length <= 1
+      ) {
+        return;
+      }
+
+      const nextPath =
+        movePath.slice(
+          0,
+          -1
+        );
+
+      const parent =
+        nextPath[
+          nextPath.length - 1
+        ];
+
+      setMovePath(nextPath);
+
+      await loadMoveFolders(
+        parent.id || null
+      );
+    };
+
+
+  /*
+   * Close move modal.
+   */
+  const closeMoveModal = () => {
+    if (moving) {
+      return;
+    }
+
+    setMoveModalOpen(false);
+
+    setFileToMove(null);
+
+    setMoveFolders([]);
+
+    setMovePath([
+      ROOT_BREADCRUMB,
+    ]);
+  };
+
+
+  /*
+   * Move the selected file into
+   * the currently selected folder.
+   */
+  const handleConfirmMove =
+    async () => {
+      if (!fileToMove) {
         return;
       }
 
       const destination =
-        folderId.trim() || null;
+        movePath[
+          movePath.length - 1
+        ];
 
-      try {
-        setError("");
 
-        await fileService.moveFile(
-          file.id,
-          destination
+      /*
+       * If the selected destination
+       * is already the current folder,
+       * there is nothing to do.
+       */
+      if (
+        destination.id ===
+        (currentFolder?.id || null)
+      ) {
+        setError(
+          "The file is already in this folder"
         );
 
+        return;
+      }
+
+
+      setMoving(true);
+      setError("");
+
+      try {
+        await fileService.moveFile(
+          fileToMove.id,
+          destination.id || null
+        );
+
+
+        closeMoveModal();
+
+
+        /*
+         * Refresh the current location
+         * after moving the file.
+         */
         if (currentFolder) {
           await loadFolderContents(
             currentFolder
@@ -428,6 +605,8 @@ const Dashboard = () => {
           err.message ||
             "Failed to move file"
         );
+      } finally {
+        setMoving(false);
       }
     };
 
@@ -481,13 +660,13 @@ const Dashboard = () => {
 
 
   /*
-   * Navigate to a breadcrumb.
+   * Breadcrumb navigation.
    */
   const handleBreadcrumbClick =
-    async (breadcrumb, index) => {
-      /*
-       * Root breadcrumb.
-       */
+    async (
+      breadcrumb,
+      index
+    ) => {
       if (
         !breadcrumb.id ||
         index === 0
@@ -496,18 +675,12 @@ const Dashboard = () => {
         return;
       }
 
-
-      /*
-       * If the breadcrumb is already
-       * the current folder, do nothing.
-       */
       if (
         currentFolder?.id ===
         breadcrumb.id
       ) {
         return;
       }
-
 
       await loadFolderContents({
         id: breadcrumb.id,
@@ -517,57 +690,38 @@ const Dashboard = () => {
 
 
   /*
-   * Go exactly one level backward.
+   * Back one folder.
    */
-  const handleBack = async () => {
-    /*
-     * Already at root.
-     */
-    if (
-      !currentFolder ||
-      breadcrumbs.length <= 1
-    ) {
-      await loadRootContents();
-      return;
-    }
+  const handleBack =
+    async () => {
+      if (
+        !currentFolder ||
+        breadcrumbs.length <= 1
+      ) {
+        await loadRootContents();
+        return;
+      }
+
+      const parentIndex =
+        breadcrumbs.length - 2;
+
+      const parent =
+        breadcrumbs[parentIndex];
 
 
-    /*
-     * Current folder is the last
-     * breadcrumb.
-     *
-     * Parent is therefore the item
-     * immediately before it.
-     */
-    const parentIndex =
-      breadcrumbs.length - 2;
-
-    const parent =
-      breadcrumbs[parentIndex];
+      if (!parent?.id) {
+        await loadRootContents();
+        return;
+      }
 
 
-    /*
-     * Parent is My Drive.
-     */
-    if (!parent?.id) {
-      await loadRootContents();
-      return;
-    }
+      await loadFolderContents({
+        id: parent.id,
+        name: parent.name,
+      });
+    };
 
 
-    /*
-     * Open parent folder.
-     */
-    await loadFolderContents({
-      id: parent.id,
-      name: parent.name,
-    });
-  };
-
-
-  /*
-   * Search folders.
-   */
   const filteredFolders =
     folders.filter((folder) =>
       folder.name
@@ -578,9 +732,6 @@ const Dashboard = () => {
     );
 
 
-  /*
-   * Search files.
-   */
   const filteredFiles =
     files.filter((file) =>
       file.name
@@ -656,14 +807,13 @@ const Dashboard = () => {
         </div>
 
 
-        {/* Breadcrumb navigation */}
+        {/* Breadcrumbs */}
         <div className="mb-4 flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white px-4 py-3">
 
           <Home
             size={17}
             className="shrink-0 text-slate-400"
           />
-
 
           {breadcrumbs.map(
             (
@@ -684,7 +834,6 @@ const Dashboard = () => {
                     className="text-slate-300"
                   />
                 )}
-
 
                 <button
                   onClick={() =>
@@ -714,10 +863,12 @@ const Dashboard = () => {
         </div>
 
 
-        {/* Back button */}
+        {/* Back */}
         {currentFolder && (
           <button
-            onClick={handleBack}
+            onClick={
+              handleBack
+            }
             disabled={loading}
             className="mb-6 flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -906,6 +1057,270 @@ const Dashboard = () => {
         )}
 
       </div>
+
+
+      {/* =====================================================
+          MOVE FILE MODAL
+          ===================================================== */}
+
+      {moveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+
+              <div>
+                <h2 className="font-semibold text-slate-900">
+                  Move file
+                </h2>
+
+                <p
+                  className="mt-1 max-w-sm truncate text-xs text-slate-400"
+                  title={
+                    fileToMove?.name
+                  }
+                >
+                  {fileToMove?.name}
+                </p>
+              </div>
+
+
+              <button
+                onClick={
+                  closeMoveModal
+                }
+                disabled={moving}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+              >
+                <X size={19} />
+              </button>
+
+            </div>
+
+
+            {/* Current destination */}
+            <div className="border-b border-slate-100 px-5 py-3">
+
+              <div className="flex items-center gap-1 overflow-x-auto">
+
+                {movePath.map(
+                  (
+                    breadcrumb,
+                    index
+                  ) => (
+                    <div
+                      key={
+                        breadcrumb.id ||
+                        "root"
+                      }
+                      className="flex shrink-0 items-center"
+                    >
+
+                      {index > 0 && (
+                        <ChevronRight
+                          size={15}
+                          className="mx-1 text-slate-300"
+                        />
+                      )}
+
+
+                      <button
+                        onClick={() =>
+                          handleMoveBreadcrumb(
+                            breadcrumb,
+                            index
+                          )
+                        }
+                        disabled={
+                          index ===
+                          movePath.length - 1
+                        }
+                        className={`rounded-md px-2 py-1 text-xs font-medium ${
+                          index ===
+                          movePath.length - 1
+                            ? "cursor-default bg-slate-100 text-slate-800"
+                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                        }`}
+                      >
+                        {breadcrumb.name}
+                      </button>
+
+                    </div>
+                  )
+                )}
+
+              </div>
+
+            </div>
+
+
+            {/* Folder list */}
+            <div className="max-h-80 overflow-y-auto p-3">
+
+              {moveLoading ? (
+                <div className="flex min-h-48 items-center justify-center">
+
+                  <div className="text-center">
+
+                    <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
+
+                    <p className="text-sm text-slate-400">
+                      Loading folders...
+                    </p>
+
+                  </div>
+
+                </div>
+              ) : moveFolders.length >
+                0 ? (
+                <div className="space-y-1">
+
+                  {moveFolders.map(
+                    (folder) => {
+                      const isCurrent =
+                        folder.id ===
+                        currentFolder?.id;
+
+                      return (
+                        <button
+                          key={
+                            folder.id
+                          }
+                          onClick={() =>
+                            handleMoveFolderOpen(
+                              folder
+                            )
+                          }
+                          disabled={
+                            moving
+                          }
+                          className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition ${
+                            isCurrent
+                              ? "bg-slate-50 opacity-50"
+                              : "hover:bg-slate-50"
+                          }`}
+                        >
+
+                          <div className="flex min-w-0 items-center gap-3">
+
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+
+                              <Folder
+                                size={18}
+                              />
+
+                            </div>
+
+
+                            <span className="truncate text-sm font-medium text-slate-700">
+                              {folder.name}
+                            </span>
+
+                          </div>
+
+
+                          <ChevronRight
+                            size={17}
+                            className="shrink-0 text-slate-300"
+                          />
+
+                        </button>
+                      );
+                    }
+                  )}
+
+                </div>
+              ) : (
+                <div className="flex min-h-48 flex-col items-center justify-center text-center">
+
+                  <FolderOpen
+                    size={36}
+                    className="mb-3 text-slate-300"
+                  />
+
+                  <p className="font-medium text-slate-600">
+                    No subfolders
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-400">
+                    You can move the file here.
+                  </p>
+
+                </div>
+              )}
+
+            </div>
+
+
+            {/* Modal footer */}
+            <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4">
+
+              <div className="min-w-0">
+
+                <p className="text-xs text-slate-400">
+                  Destination
+                </p>
+
+                <p className="max-w-56 truncate text-sm font-semibold text-slate-700">
+                  {
+                    movePath[
+                      movePath.length - 1
+                    ]?.name
+                  }
+                </p>
+
+              </div>
+
+
+              <div className="flex gap-2">
+
+                <button
+                  onClick={
+                    closeMoveModal
+                  }
+                  disabled={moving}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+
+                <button
+                  onClick={
+                    handleConfirmMove
+                  }
+                  disabled={
+                    moving ||
+                    moveLoading ||
+                    movePath.length === 0
+                  }
+                  className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+
+                  {moving ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-white" />
+                      Moving...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} />
+                      Move here
+                    </>
+                  )}
+
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
     </Layout>
   );
