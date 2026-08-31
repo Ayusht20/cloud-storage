@@ -51,89 +51,107 @@ const Dashboard = () => {
   const fileInputRef = useRef(null);
 
 
-  const loadRootContents = async () => {
-    setLoading(true);
-    setError("");
+  /*
+   * Load root folder contents.
+   */
+  const loadRootContents =
+    async () => {
+      setLoading(true);
+      setError("");
 
-    try {
-      const data =
-        await folderService.getRootContents();
+      try {
+        const data =
+          await folderService.getRootContents();
 
-      setCurrentFolder(null);
+        setCurrentFolder(null);
 
-      setFolders(
-        data?.folders || []
-      );
+        setFolders(
+          data?.folders || []
+        );
 
-      setFiles(
-        data?.files || []
-      );
+        setFiles(
+          data?.files || []
+        );
 
-      setBreadcrumbs(
-        data?.breadcrumbs || [
-          {
-            id: null,
-            name: "My Drive",
-          },
-        ]
-      );
-    } catch (err) {
-      setError(
-        err.message ||
-          "Failed to load your files"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-const loadFolderContents = async (folder) => {
-  setLoading(true);
-  setError("");
-
-  try {
-    const [
-      data,
-      breadcrumbData,
-    ] = await Promise.all([
-      folderService.getFolderContents(
-        folder.id
-      ),
-      folderService.getBreadcrumbs(
-        folder.id
-      ),
-    ]);
-
-    setCurrentFolder(folder);
-
-    setFolders(
-      data?.folders || []
-    );
-
-    setFiles(
-      data?.files || []
-    );
-
-    setBreadcrumbs(
-      breadcrumbData || []
-    );
-  } catch (err) {
-    setError(
-      err.message ||
-        "Failed to open folder"
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+        setBreadcrumbs(
+          data?.breadcrumbs || [
+            {
+              id: null,
+              name: "My Drive",
+            },
+          ]
+        );
+      } catch (err) {
+        setError(
+          err.message ||
+            "Failed to load your files"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
 
+  /*
+   * Load a folder and its breadcrumbs
+   * at the same time.
+   */
+  const loadFolderContents =
+    async (folder) => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const [
+          data,
+          breadcrumbData,
+        ] = await Promise.all([
+          folderService.getFolderContents(
+            folder.id
+          ),
+
+          folderService.getBreadcrumbs(
+            folder.id
+          ),
+        ]);
+
+        setCurrentFolder(folder);
+
+        setFolders(
+          data?.folders || []
+        );
+
+        setFiles(
+          data?.files || []
+        );
+
+        setBreadcrumbs(
+          breadcrumbData || []
+        );
+      } catch (err) {
+        setError(
+          err.message ||
+            "Failed to open folder"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+
+  /*
+   * Load the dashboard when the
+   * component is mounted.
+   */
   useEffect(() => {
     loadRootContents();
   }, []);
 
 
+  /*
+   * Create a new folder inside
+   * the current folder.
+   */
   const handleCreateFolder =
     async () => {
       const name =
@@ -167,6 +185,9 @@ const loadFolderContents = async (folder) => {
     };
 
 
+  /*
+   * Open the hidden file picker.
+   */
   const handleUploadClick = () => {
     if (uploading) {
       return;
@@ -176,6 +197,9 @@ const loadFolderContents = async (folder) => {
   };
 
 
+  /*
+   * Upload the selected file.
+   */
   const handleFileUpload =
     async (event) => {
       const selectedFile =
@@ -195,9 +219,9 @@ const loadFolderContents = async (folder) => {
         );
 
         /*
-         * Reload the current folder so
-         * the newly uploaded file appears
-         * immediately in the dashboard.
+         * Refresh the current location
+         * so the uploaded file appears
+         * immediately.
          */
         if (currentFolder) {
           await loadFolderContents(
@@ -215,14 +239,138 @@ const loadFolderContents = async (folder) => {
         setUploading(false);
 
         /*
-         * Clear the input so the same file
-         * can be selected again later.
+         * Reset the input so the same
+         * file can be selected again.
          */
         event.target.value = "";
       }
     };
 
 
+  /*
+   * Download a file.
+   */
+  const handleDownload =
+    async (file) => {
+      try {
+        setError("");
+
+        const data =
+          await fileService.downloadFile(
+            file.id
+          );
+
+        if (!data?.download_url) {
+          throw new Error(
+            "Download URL was not returned"
+          );
+        }
+
+        window.open(
+          data.download_url,
+          "_blank",
+          "noopener,noreferrer"
+        );
+      } catch (err) {
+        setError(
+          err.message ||
+            "Failed to download file"
+        );
+      }
+    };
+
+
+  /*
+   * Rename a file.
+   */
+  const handleRename =
+    async (file) => {
+      const newName =
+        window.prompt(
+          "Enter new file name",
+          file.name
+        );
+
+      if (
+        !newName ||
+        !newName.trim() ||
+        newName.trim() === file.name
+      ) {
+        return;
+      }
+
+      try {
+        setError("");
+
+        await fileService.renameFile(
+          file.id,
+          newName.trim()
+        );
+
+        if (currentFolder) {
+          await loadFolderContents(
+            currentFolder
+          );
+        } else {
+          await loadRootContents();
+        }
+      } catch (err) {
+        setError(
+          err.message ||
+            "Failed to rename file"
+        );
+      }
+    };
+
+
+  /*
+   * Move a file to another folder.
+   *
+   * This is temporarily using a
+   * folder UUID prompt. We will replace
+   * this with a proper folder picker UI.
+   */
+  const handleMove =
+    async (file) => {
+      const folderId =
+        window.prompt(
+          "Enter destination folder ID. Leave empty to move to My Drive."
+        );
+
+      if (folderId === null) {
+        return;
+      }
+
+      const destination =
+        folderId.trim() || null;
+
+      try {
+        setError("");
+
+        await fileService.moveFile(
+          file.id,
+          destination
+        );
+
+        if (currentFolder) {
+          await loadFolderContents(
+            currentFolder
+          );
+        } else {
+          await loadRootContents();
+        }
+      } catch (err) {
+        setError(
+          err.message ||
+            "Failed to move file"
+        );
+      }
+    };
+
+
+  /*
+   * Move a file to trash.
+   */
   const handleDeleteFile =
     async (file) => {
       const confirmed =
@@ -235,6 +383,8 @@ const loadFolderContents = async (folder) => {
       }
 
       try {
+        setError("");
+
         await fileService.deleteFile(
           file.id
         );
@@ -255,12 +405,18 @@ const loadFolderContents = async (folder) => {
     };
 
 
+  /*
+   * Open a folder.
+   */
   const handleFolderOpen =
     (folder) => {
       loadFolderContents(folder);
     };
 
 
+  /*
+   * Navigate through breadcrumbs.
+   */
   const handleBreadcrumbClick =
     async (breadcrumb) => {
       if (!breadcrumb.id) {
@@ -275,6 +431,10 @@ const loadFolderContents = async (folder) => {
     };
 
 
+  /*
+   * Filter folders using the
+   * dashboard search box.
+   */
   const filteredFolders =
     folders.filter((folder) =>
       folder.name
@@ -285,6 +445,10 @@ const loadFolderContents = async (folder) => {
     );
 
 
+  /*
+   * Filter files using the
+   * dashboard search box.
+   */
   const filteredFiles =
     files.filter((file) =>
       file.name
@@ -437,15 +601,31 @@ const loadFolderContents = async (folder) => {
         )}
 
 
+        {/* Error */}
         {error && (
-          <div className="mb-6 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-            {error}
+          <div className="mb-6 flex items-center justify-between rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
+
+            <span>
+              {error}
+            </span>
+
+            <button
+              onClick={() =>
+                setError("")
+              }
+              className="ml-4 font-semibold text-red-500 hover:text-red-700"
+            >
+              ×
+            </button>
+
           </div>
         )}
 
 
+        {/* Loading */}
         {loading ? (
           <div className="flex min-h-64 items-center justify-center">
+
             <div className="text-center">
 
               <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
@@ -455,6 +635,7 @@ const loadFolderContents = async (folder) => {
               </p>
 
             </div>
+
           </div>
         ) : (
           <>
@@ -557,6 +738,15 @@ const loadFolderContents = async (folder) => {
                       <FileCard
                         key={file.id}
                         file={file}
+                        onDownload={
+                          handleDownload
+                        }
+                        onRename={
+                          handleRename
+                        }
+                        onMove={
+                          handleMove
+                        }
                         onDelete={
                           handleDeleteFile
                         }
