@@ -5,7 +5,17 @@ import {
   Video,
   Music,
   MoreVertical,
+  Download,
+  Pencil,
+  FolderInput,
+  Trash2,
 } from "lucide-react";
+
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 
 const getFileIcon = (
@@ -75,15 +85,59 @@ const formatSize = (size) => {
 
 const FileCard = ({
   file,
+  onDownload,
+  onRename,
+  onMove,
   onDelete,
 }) => {
+  const [menuOpen, setMenuOpen] =
+    useState(false);
+
+  const menuRef = useRef(null);
+
+
+  useEffect(() => {
+    const handleOutsideClick =
+      (event) => {
+        if (
+          menuRef.current &&
+          !menuRef.current.contains(
+            event.target
+          )
+        ) {
+          setMenuOpen(false);
+        }
+      };
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick
+      );
+    };
+  }, []);
+
+
   const Icon = getFileIcon(
     file.mime_type
   );
 
 
+  const handleAction = (
+    action
+  ) => {
+    setMenuOpen(false);
+    action?.(file);
+  };
+
+
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+    <div className="relative rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
 
       <div className="flex items-start justify-between">
 
@@ -92,12 +146,85 @@ const FileCard = ({
         </div>
 
 
-        <button
-          className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          title="More"
+        <div
+          ref={menuRef}
+          className="relative"
         >
-          <MoreVertical size={18} />
-        </button>
+
+          <button
+            onClick={() =>
+              setMenuOpen(
+                (value) => !value
+              )
+            }
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            title="File actions"
+          >
+            <MoreVertical size={18} />
+          </button>
+
+
+          {menuOpen && (
+            <div className="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+
+              <button
+                onClick={() =>
+                  handleAction(
+                    onDownload
+                  )
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Download size={16} />
+                Download
+              </button>
+
+
+              <button
+                onClick={() =>
+                  handleAction(
+                    onRename
+                  )
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Pencil size={16} />
+                Rename
+              </button>
+
+
+              <button
+                onClick={() =>
+                  handleAction(
+                    onMove
+                  )
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <FolderInput size={16} />
+                Move
+              </button>
+
+
+              <div className="my-1 border-t border-slate-100" />
+
+
+              <button
+                onClick={() =>
+                  handleAction(
+                    onDelete
+                  )
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50"
+              >
+                <Trash2 size={16} />
+                Move to trash
+              </button>
+
+            </div>
+          )}
+
+        </div>
 
       </div>
 
@@ -116,18 +243,6 @@ const FileCard = ({
         </p>
 
       </div>
-
-
-      {onDelete && (
-        <button
-          onClick={() =>
-            onDelete(file)
-          }
-          className="mt-4 text-xs font-medium text-red-500 hover:text-red-600"
-        >
-          Move to trash
-        </button>
-      )}
 
     </div>
   );
