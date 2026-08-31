@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -41,8 +42,13 @@ const Dashboard = () => {
   const [loading, setLoading] =
     useState(true);
 
+  const [uploading, setUploading] =
+    useState(false);
+
   const [error, setError] =
     useState("");
+
+  const fileInputRef = useRef(null);
 
 
   const loadRootContents = async () => {
@@ -160,6 +166,62 @@ const Dashboard = () => {
     };
 
 
+  const handleUploadClick = () => {
+    if (uploading) {
+      return;
+    }
+
+    fileInputRef.current?.click();
+  };
+
+
+  const handleFileUpload =
+    async (event) => {
+      const selectedFile =
+        event.target.files?.[0];
+
+      if (!selectedFile) {
+        return;
+      }
+
+      setError("");
+      setUploading(true);
+
+      try {
+        await fileService.uploadFile(
+          selectedFile,
+          currentFolder?.id || null
+        );
+
+        /*
+         * Reload the current folder so
+         * the newly uploaded file appears
+         * immediately in the dashboard.
+         */
+        if (currentFolder) {
+          await loadFolderContents(
+            currentFolder
+          );
+        } else {
+          await loadRootContents();
+        }
+      } catch (err) {
+        setError(
+          err.message ||
+            "File upload failed"
+        );
+      } finally {
+        setUploading(false);
+
+        /*
+         * Clear the input so the same file
+         * can be selected again later.
+         */
+        event.target.value = "";
+      }
+    };
+
+
   const handleDeleteFile =
     async (file) => {
       const confirmed =
@@ -260,7 +322,8 @@ const Dashboard = () => {
               onClick={
                 handleCreateFolder
               }
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              disabled={uploading}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <FolderPlus size={18} />
               New folder
@@ -268,11 +331,28 @@ const Dashboard = () => {
 
 
             <button
-              className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              onClick={
+                handleUploadClick
+              }
+              disabled={uploading}
+              className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Upload size={18} />
-              Upload
+
+              {uploading
+                ? "Uploading..."
+                : "Upload"}
             </button>
+
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={
+                handleFileUpload
+              }
+              className="hidden"
+            />
 
           </div>
 
@@ -366,11 +446,13 @@ const Dashboard = () => {
         {loading ? (
           <div className="flex min-h-64 items-center justify-center">
             <div className="text-center">
+
               <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
 
               <p className="text-sm text-slate-400">
                 Loading your files...
               </p>
+
             </div>
           </div>
         ) : (
@@ -382,6 +464,7 @@ const Dashboard = () => {
               <div className="mb-4 flex items-center justify-between">
 
                 <div className="flex items-center gap-2">
+
                   <Folder
                     size={20}
                     className="text-slate-500"
@@ -390,6 +473,7 @@ const Dashboard = () => {
                   <h2 className="font-semibold text-slate-800">
                     Folders
                   </h2>
+
                 </div>
 
                 <span className="text-xs text-slate-400">
@@ -444,6 +528,7 @@ const Dashboard = () => {
               <div className="mb-4 flex items-center justify-between">
 
                 <div className="flex items-center gap-2">
+
                   <Files
                     size={20}
                     className="text-slate-500"
@@ -452,6 +537,7 @@ const Dashboard = () => {
                   <h2 className="font-semibold text-slate-800">
                     Files
                   </h2>
+
                 </div>
 
                 <span className="text-xs text-slate-400">

@@ -7,18 +7,26 @@ const request = async (
   endpoint,
   options = {}
 ) => {
+  const isFormData =
+    options.body instanceof FormData;
+
+
   const response = await fetch(
     `${API_BASE_URL}${endpoint}`,
     {
       credentials: "include",
       ...options,
+
       headers: {
-        ...(options.body
-          ? {
-              "Content-Type":
-                "application/json",
-            }
-          : {}),
+        ...(isFormData
+          ? {}
+          : options.body
+            ? {
+                "Content-Type":
+                  "application/json",
+              }
+            : {}),
+
         ...(options.headers || {}),
       },
     }
@@ -40,7 +48,9 @@ const request = async (
         "Something went wrong"
     );
 
-    error.status = response.status;
+    error.status =
+      response.status;
+
     error.data = data;
 
     throw error;
@@ -62,7 +72,10 @@ const api = {
   post(endpoint, body) {
     return request(endpoint, {
       method: "POST",
-      body: JSON.stringify(body),
+      body:
+        body instanceof FormData
+          ? body
+          : JSON.stringify(body),
     });
   },
 
