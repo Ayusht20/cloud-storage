@@ -5,6 +5,7 @@ import {
   Video,
   Music,
   MoreVertical,
+  Eye,
   Download,
   Pencil,
   FolderInput,
@@ -18,24 +19,16 @@ import {
 } from "react";
 
 
-const getFileIcon = (
-  mimeType
-) => {
-  if (
-    mimeType?.startsWith("image/")
-  ) {
+const getFileIcon = (mimeType) => {
+  if (mimeType?.startsWith("image/")) {
     return Image;
   }
 
-  if (
-    mimeType?.startsWith("video/")
-  ) {
+  if (mimeType?.startsWith("video/")) {
     return Video;
   }
 
-  if (
-    mimeType?.startsWith("audio/")
-  ) {
+  if (mimeType?.startsWith("audio/")) {
     return Music;
   }
 
@@ -67,16 +60,14 @@ const formatSize = (size) => {
 
   while (
     value >= 1024 &&
-    unitIndex <
-      units.length - 1
+    unitIndex < units.length - 1
   ) {
     value /= 1024;
     unitIndex++;
   }
 
   return `${value.toFixed(
-    value >= 10 ||
-      unitIndex === 0
+    value >= 10 || unitIndex === 0
       ? 0
       : 1
   )} ${units[unitIndex]}`;
@@ -85,6 +76,7 @@ const formatSize = (size) => {
 
 const FileCard = ({
   file,
+  onView,
   onDownload,
   onRename,
   onMove,
@@ -97,17 +89,16 @@ const FileCard = ({
 
 
   useEffect(() => {
-    const handleOutsideClick =
-      (event) => {
-        if (
-          menuRef.current &&
-          !menuRef.current.contains(
-            event.target
-          )
-        ) {
-          setMenuOpen(false);
-        }
-      };
+    const handleOutsideClick = (event) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(
+          event.target
+        )
+      ) {
+        setMenuOpen(false);
+      }
+    };
 
     document.addEventListener(
       "mousedown",
@@ -128,9 +119,7 @@ const FileCard = ({
   );
 
 
-  const handleAction = (
-    action
-  ) => {
+  const handleAction = (action) => {
     setMenuOpen(false);
     action?.(file);
   };
@@ -141,9 +130,15 @@ const FileCard = ({
 
       <div className="flex items-start justify-between">
 
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+        <button
+          onClick={() =>
+            handleAction(onView)
+          }
+          className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition hover:bg-slate-200"
+          title="View file"
+        >
           <Icon size={24} />
-        </div>
+        </button>
 
 
         <div
@@ -169,9 +164,18 @@ const FileCard = ({
 
               <button
                 onClick={() =>
-                  handleAction(
-                    onDownload
-                  )
+                  handleAction(onView)
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Eye size={16} />
+                View
+              </button>
+
+
+              <button
+                onClick={() =>
+                  handleAction(onDownload)
                 }
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
               >
@@ -182,9 +186,7 @@ const FileCard = ({
 
               <button
                 onClick={() =>
-                  handleAction(
-                    onRename
-                  )
+                  handleAction(onRename)
                 }
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
               >
@@ -195,9 +197,7 @@ const FileCard = ({
 
               <button
                 onClick={() =>
-                  handleAction(
-                    onMove
-                  )
+                  handleAction(onMove)
                 }
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
               >
@@ -211,9 +211,7 @@ const FileCard = ({
 
               <button
                 onClick={() =>
-                  handleAction(
-                    onDelete
-                  )
+                  handleAction(onDelete)
                 }
                 className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50"
               >
@@ -229,7 +227,12 @@ const FileCard = ({
       </div>
 
 
-      <div className="mt-4">
+      <div
+        className="mt-4 cursor-pointer"
+        onDoubleClick={() =>
+          handleAction(onView)
+        }
+      >
 
         <p
           className="truncate font-semibold text-slate-800"
