@@ -1,29 +1,52 @@
-import { useEffect, useState } from "react";
-import api from "./services/api";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+} from "react-router-dom";
 
-function App() {
-  const [message, setMessage] = useState("Connecting to backend...");
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
 
-  useEffect(() => {
-    const checkBackend = async () => {
-      try {
-        const response = await api.get("/health");
-        setMessage(`Backend: ${response.data.status}`);
-      } catch (error) {
-        console.error("Backend connection failed:", error);
-        setMessage("Backend connection failed");
-      }
-    };
 
-    checkBackend();
-  }, []);
-
+const App = () => {
   return (
-    <div>
-      <h1>Cloud Storage Service</h1>
-      <p>{message}</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to="/dashboard"
+              replace
+            />
+          }
+        />
+
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
+        <Route
+          path="/register"
+          element={<Register />}
+        />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </BrowserRouter>
   );
-}
+};
+
 
 export default App;
