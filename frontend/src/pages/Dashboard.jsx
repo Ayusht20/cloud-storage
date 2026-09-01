@@ -26,6 +26,7 @@ import ShareModal from "../components/ShareModal";
 
 import fileService from "../services/fileService";
 import folderService from "../services/folderService";
+import { useAuth } from "../context/AuthContext";
 
 
 const ROOT_FOLDER = {
@@ -35,6 +36,8 @@ const ROOT_FOLDER = {
 
 
 const Dashboard = () => {
+  const { user, logout } = useAuth();
+
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
 
@@ -852,6 +855,19 @@ const handleDownload = async (
               {uploading
                 ? "Uploading..."
                 : "Upload"}
+            </button>
+
+
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-50"
+              title={
+                user?.email
+                  ? `Logout ${user.email}`
+                  : "Logout"
+              }
+            >
+              Logout
             </button>
 
 

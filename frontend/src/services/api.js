@@ -3,12 +3,28 @@ const API_BASE_URL =
   "http://127.0.0.1:8000";
 
 
+const redirectToLogin = () => {
+  if (
+    window.location.pathname !==
+    "/login"
+  ) {
+    window.location.href =
+      "/login";
+  }
+};
+
+
+// ============================================================
+// JSON REQUEST
+// ============================================================
+
 const request = async (
   endpoint,
   options = {}
 ) => {
   const isFormData =
     options.body instanceof FormData;
+
 
   const response = await fetch(
     `${API_BASE_URL}${endpoint}`,
@@ -32,25 +48,49 @@ const request = async (
   );
 
 
+  // ----------------------------------------------------------
+  // AUTOMATIC UNAUTHORIZED HANDLING
+  // ----------------------------------------------------------
+
+  if (response.status === 401) {
+
+    redirectToLogin();
+
+    const error =
+      new Error(
+        "Your session has expired. Please login again."
+      );
+
+    error.status = 401;
+
+    throw error;
+  }
+
+
   let data = null;
 
+
   try {
-    data = await response.json();
+    data =
+      await response.json();
   } catch {
     data = null;
   }
 
 
   if (!response.ok) {
-    const error = new Error(
-      data?.detail ||
-        "Something went wrong"
-    );
+
+    const error =
+      new Error(
+        data?.detail ||
+          "Something went wrong"
+      );
 
     error.status =
       response.status;
 
-    error.data = data;
+    error.data =
+      data;
 
     throw error;
   }
@@ -68,6 +108,7 @@ const requestBlob = async (
   endpoint,
   options = {}
 ) => {
+
   const response = await fetch(
     `${API_BASE_URL}${endpoint}`,
     {
@@ -81,16 +122,40 @@ const requestBlob = async (
   );
 
 
+  // ----------------------------------------------------------
+  // AUTOMATIC UNAUTHORIZED HANDLING
+  // ----------------------------------------------------------
+
+  if (response.status === 401) {
+
+    redirectToLogin();
+
+    const error =
+      new Error(
+        "Your session has expired. Please login again."
+      );
+
+    error.status = 401;
+
+    throw error;
+  }
+
+
   if (!response.ok) {
+
     let message =
       "Something went wrong";
 
+
     try {
+
       const data =
         await response.json();
 
       message =
-        data?.detail || message;
+        data?.detail ||
+          message;
+
     } catch {
       // Ignore JSON parsing errors
     }
@@ -109,6 +174,10 @@ const requestBlob = async (
   return response.blob();
 };
 
+
+// ============================================================
+// API
+// ============================================================
 
 const api = {
 
@@ -148,6 +217,7 @@ const api = {
     endpoint,
     body
   ) {
+
     return request(
       endpoint,
       {
@@ -170,6 +240,7 @@ const api = {
     endpoint,
     body
   ) {
+
     return request(
       endpoint,
       {
@@ -187,6 +258,7 @@ const api = {
   // ----------------------------------------------------------
 
   delete(endpoint) {
+
     return request(
       endpoint,
       {
