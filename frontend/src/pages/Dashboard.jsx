@@ -277,130 +277,84 @@ const Dashboard = () => {
   // ==================================================
   // VIEW FILE
   // ==================================================
+const handleView = async (file) => {
+  setError("");
 
-  const handleView = async (file) => {
-    setError("");
+  setPreviewFile(file);
+  setPreviewUrl("");
+  setPreviewLoading(true);
 
-    setPreviewFile(file);
-    setPreviewUrl("");
-    setPreviewLoading(true);
-
-    try {
-      const data =
-        await fileService.getFile(
-          file.id
-        );
-
-      /*
-       * Backend returns storage_url.
-       */
-
-      const url =
-        data?.storage_url ||
-        data?.url ||
-        data?.download_url;
-
-      if (!url) {
-        throw new Error(
-          "Preview URL was not returned"
-        );
-      }
-
-      setPreviewUrl(url);
-    } catch (err) {
-      setPreviewFile(null);
-
-      setError(
-        err.message ||
-          "Unable to preview this file"
+  try {
+    const blob =
+      await fileService.getFileContent(
+        file.id
       );
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
+
+    const url =
+      window.URL.createObjectURL(
+        blob
+      );
+
+    setPreviewUrl(url);
+
+  } catch (err) {
+
+    setPreviewFile(null);
+
+    setError(
+      err.message ||
+        "Unable to preview this file"
+    );
+
+  } finally {
+
+    setPreviewLoading(false);
+  }
+};
 
 
   // ==================================================
   // CLOSE PREVIEW
   // ==================================================
 
-  const handleClosePreview = () => {
-    setPreviewFile(null);
-    setPreviewUrl("");
-    setPreviewLoading(false);
-  };
+const handleClosePreview = () => {
+
+  if (previewUrl) {
+    window.URL.revokeObjectURL(
+      previewUrl
+    );
+  }
+
+  setPreviewFile(null);
+  setPreviewUrl("");
+  setPreviewLoading(false);
+};
 
 
   // ==================================================
   // DOWNLOAD FILE
   // ==================================================
 
-  const handleDownload = async (
-    file
-  ) => {
-    try {
-      setError("");
+const handleDownload = async (
+  file
+) => {
+  try {
 
-      const data =
-        await fileService.downloadFile(
-          file.id
-        );
+    setError("");
 
-      const downloadUrl =
-        data?.download_url;
+    await fileService.downloadFile(
+      file
+    );
 
-      if (!downloadUrl) {
-        throw new Error(
-          "Download URL was not returned"
-        );
-      }
+  } catch (err) {
 
-      /*
-       * Let the browser download the
-       * original file from storage.
-       *
-       * We intentionally do NOT fetch it
-       * as JSON/blob here because the backend
-       * already provides the proper file URL.
-       */
+    setError(
+      err.message ||
+        "Failed to download file"
+    );
 
-      const link =
-        document.createElement(
-          "a"
-        );
-
-      link.href = downloadUrl;
-
-      link.target = "_blank";
-
-      link.rel =
-        "noopener noreferrer";
-
-      /*
-       * This asks the browser to download
-       * rather than navigating the application.
-       *
-       * The storage response determines the
-       * actual original file format.
-       */
-
-      link.download =
-        file.name || "";
-
-      document.body.appendChild(
-        link
-      );
-
-      link.click();
-
-      link.remove();
-    } catch (err) {
-      setError(
-        err.message ||
-          "Failed to download file"
-      );
-    }
-  };
+  }
+};
 
 
   // ==================================================

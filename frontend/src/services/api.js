@@ -3,55 +3,12 @@ const API_BASE_URL =
   "http://127.0.0.1:8000";
 
 
-// --------------------------------------------------
-// Shared refresh promise
-// Prevents multiple simultaneous refresh requests.
-// --------------------------------------------------
-
-let refreshPromise = null;
-
-
-const refreshAccessToken = async () => {
-  if (!refreshPromise) {
-    refreshPromise = fetch(
-      `${API_BASE_URL}/auth/refresh`,
-      {
-        method: "POST",
-        credentials: "include",
-      }
-    )
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error("Session refresh failed");
-        }
-
-        try {
-          return await response.json();
-        } catch {
-          return null;
-        }
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
-  }
-
-  return refreshPromise;
-};
-
-
-// --------------------------------------------------
-// Request helper
-// --------------------------------------------------
-
 const request = async (
   endpoint,
-  options = {},
-  retry = true
+  options = {}
 ) => {
   const isFormData =
     options.body instanceof FormData;
-
 
   const response = await fetch(
     `${API_BASE_URL}${endpoint}`,
@@ -75,33 +32,6 @@ const request = async (
   );
 
 
-  // ------------------------------------------------
-  // Handle expired authentication once
-  // ------------------------------------------------
-
-  if (
-    response.status === 401 &&
-    retry &&
-    !endpoint.startsWith("/auth/")
-  ) {
-    try {
-      await refreshAccessToken();
-
-      return request(
-        endpoint,
-        options,
-        false
-      );
-    } catch {
-      // Continue to normal error handling below.
-    }
-  }
-
-
-  // ------------------------------------------------
-  // Parse response
-  // ------------------------------------------------
-
   let data = null;
 
   try {
@@ -110,10 +40,6 @@ const request = async (
     data = null;
   }
 
-
-  // ------------------------------------------------
-  // Handle errors
-  // ------------------------------------------------
 
   if (!response.ok) {
     const error = new Error(
@@ -134,47 +60,141 @@ const request = async (
 };
 
 
-// --------------------------------------------------
-// API methods
-// --------------------------------------------------
+// ============================================================
+// BLOB REQUEST
+// ============================================================
+
+const requestBlob = async (
+  endpoint,
+  options = {}
+) => {
+  const response = await fetch(
+    `${API_BASE_URL}${endpoint}`,
+    {
+      credentials: "include",
+      ...options,
+
+      headers: {
+        ...(options.headers || {}),
+      },
+    }
+  );
+
+
+  if (!response.ok) {
+    let message =
+      "Something went wrong";
+
+    try {
+      const data =
+        await response.json();
+
+      message =
+        data?.detail || message;
+    } catch {
+      // Ignore JSON parsing errors
+    }
+
+
+    const error =
+      new Error(message);
+
+    error.status =
+      response.status;
+
+    throw error;
+  }
+
+
+  return response.blob();
+};
+
 
 const api = {
+
+  // ----------------------------------------------------------
+  // GET JSON
+  // ----------------------------------------------------------
+
   get(endpoint) {
-    return request(endpoint, {
-      method: "GET",
-    });
+    return request(
+      endpoint,
+      {
+        method: "GET",
+      }
+    );
   },
 
 
-  post(endpoint, body) {
-    return request(endpoint, {
-      method: "POST",
+  // ----------------------------------------------------------
+  // GET BLOB
+  // ----------------------------------------------------------
 
-      body:
-        body instanceof FormData
-          ? body
-          : JSON.stringify(body),
-    });
+  getBlob(endpoint) {
+    return requestBlob(
+      endpoint,
+      {
+        method: "GET",
+      }
+    );
   },
 
 
-  patch(endpoint, body) {
-    return request(endpoint, {
-      method: "PATCH",
+  // ----------------------------------------------------------
+  // POST
+  // ----------------------------------------------------------
 
-      body:
-        body instanceof FormData
-          ? body
-          : JSON.stringify(body),
-    });
+  post(
+    endpoint,
+    body
+  ) {
+    return request(
+      endpoint,
+      {
+        method: "POST",
+
+        body:
+          body instanceof FormData
+            ? body
+            : JSON.stringify(body),
+      }
+    );
   },
 
+
+  // ----------------------------------------------------------
+  // PATCH
+  // ----------------------------------------------------------
+
+  patch(
+    endpoint,
+    body
+  ) {
+    return request(
+      endpoint,
+      {
+        method: "PATCH",
+
+        body:
+          JSON.stringify(body),
+      }
+    );
+  },
+
+
+  // ----------------------------------------------------------
+  // DELETE
+  // ----------------------------------------------------------
 
   delete(endpoint) {
-    return request(endpoint, {
-      method: "DELETE",
-    });
+    return request(
+      endpoint,
+      {
+        method: "DELETE",
+      }
+    );
   },
+
 };
 
 

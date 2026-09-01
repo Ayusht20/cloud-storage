@@ -2,13 +2,18 @@ import api from "./api";
 
 
 const fileService = {
-  // -----------------------------------------------
-  // Get files
-  // -----------------------------------------------
 
-  getFiles(folderId = null) {
+  // ==========================================================
+  // GET FILES
+  // ==========================================================
+
+  getFiles(
+    folderId = null
+  ) {
     if (!folderId) {
-      return api.get("/files");
+      return api.get(
+        "/files"
+      );
     }
 
     return api.get(
@@ -19,9 +24,9 @@ const fileService = {
   },
 
 
-  // -----------------------------------------------
-  // Upload
-  // -----------------------------------------------
+  // ==========================================================
+  // UPLOAD
+  // ==========================================================
 
   uploadFile(
     file,
@@ -36,11 +41,12 @@ const fileService = {
     );
 
 
-    const endpoint = folderId
-      ? `/files/upload?folder_id=${encodeURIComponent(
-          folderId
-        )}`
-      : "/files/upload";
+    const endpoint =
+      folderId
+        ? `/files/upload?folder_id=${encodeURIComponent(
+            folderId
+          )}`
+        : "/files/upload";
 
 
     return api.post(
@@ -50,9 +56,9 @@ const fileService = {
   },
 
 
-  // -----------------------------------------------
-  // Get single file
-  // -----------------------------------------------
+  // ==========================================================
+  // GET SINGLE FILE METADATA
+  // ==========================================================
 
   getFile(fileId) {
     return api.get(
@@ -63,22 +69,70 @@ const fileService = {
   },
 
 
-  // -----------------------------------------------
-  // Download
-  // -----------------------------------------------
+  // ==========================================================
+  // GET ACTUAL FILE CONTENT
+  // ==========================================================
 
-  downloadFile(fileId) {
-    return api.get(
+  getFileContent(fileId) {
+    return api.getBlob(
       `/files/${encodeURIComponent(
         fileId
-      )}/download`
+      )}/content`
     );
   },
 
 
-  // -----------------------------------------------
-  // Rename
-  // -----------------------------------------------
+  // ==========================================================
+  // DOWNLOAD ACTUAL FILE
+  // ==========================================================
+
+  async downloadFile(
+    file
+  ) {
+    const blob =
+      await this.getFileContent(
+        file.id
+      );
+
+
+    const blobUrl =
+      window.URL.createObjectURL(
+        blob
+      );
+
+
+    const link =
+      document.createElement(
+        "a"
+      );
+
+    link.href =
+      blobUrl;
+
+    link.download =
+      file.name ||
+      file.original_name ||
+      "download";
+
+
+    document.body.appendChild(
+      link
+    );
+
+    link.click();
+
+    link.remove();
+
+
+    window.URL.revokeObjectURL(
+      blobUrl
+    );
+  },
+
+
+  // ==========================================================
+  // RENAME
+  // ==========================================================
 
   renameFile(
     fileId,
@@ -95,11 +149,9 @@ const fileService = {
   },
 
 
-  // -----------------------------------------------
-  // Move
-  // folderId MUST be the actual UUID.
-  // null = My Drive / root.
-  // -----------------------------------------------
+  // ==========================================================
+  // MOVE
+  // ==========================================================
 
   moveFile(
     fileId,
@@ -110,15 +162,16 @@ const fileService = {
         fileId
       )}/move`,
       {
-        folder_id: folderId,
+        folder_id:
+          folderId,
       }
     );
   },
 
 
-  // -----------------------------------------------
-  // Move to trash
-  // -----------------------------------------------
+  // ==========================================================
+  // MOVE TO TRASH
+  // ==========================================================
 
   deleteFile(fileId) {
     return api.delete(
@@ -127,6 +180,7 @@ const fileService = {
       )}`
     );
   },
+
 };
 
 

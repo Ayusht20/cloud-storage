@@ -1,3 +1,5 @@
+import urllib.request
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -34,11 +36,16 @@ from app.services.permission_service import (
     can_edit,
 )
 
+
 router = APIRouter(
     prefix="/files",
     tags=["Files"],
 )
 
+
+# ============================================================
+# UPLOAD FILE
+# ============================================================
 
 @router.post(
     "/upload",
@@ -65,6 +72,10 @@ async def upload_user_file(
             detail="File name cannot be empty",
         )
 
+    # --------------------------------------------------------
+    # Validate target folder
+    # --------------------------------------------------------
+
     if folder_id:
         folder = db.scalar(
             select(Folder).where(
@@ -78,6 +89,10 @@ async def upload_user_file(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Folder not found",
             )
+
+    # --------------------------------------------------------
+    # Prevent duplicate file names
+    # --------------------------------------------------------
 
     existing_file = db.scalar(
         select(File).where(
@@ -94,6 +109,10 @@ async def upload_user_file(
             detail="A file with this name already exists here",
         )
 
+    # --------------------------------------------------------
+    # Read file
+    # --------------------------------------------------------
+
     file_content = await uploaded_file.read()
 
     file_size = len(file_content)
@@ -103,6 +122,10 @@ async def upload_user_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Empty files are not allowed",
         )
+
+    # --------------------------------------------------------
+    # Check maximum file size
+    # --------------------------------------------------------
 
     max_size = settings.MAX_FILE_SIZE_MB * 1024 * 1024
 
@@ -114,6 +137,10 @@ async def upload_user_file(
                 f"limit of {settings.MAX_FILE_SIZE_MB} MB"
             ),
         )
+
+    # --------------------------------------------------------
+    # Upload to storage
+    # --------------------------------------------------------
 
     try:
         upload_result = upload_file(
@@ -150,6 +177,10 @@ async def upload_user_file(
             detail="File upload failed",
         ) from exc
 
+    # --------------------------------------------------------
+    # Response
+    # --------------------------------------------------------
+
     return FileResponse(
         id=str(file_record.id),
         name=file_record.name,
@@ -169,6 +200,10 @@ async def upload_user_file(
     )
 
 
+# ============================================================
+# LIST FILES
+# ============================================================
+
 @router.get(
     "",
     response_model=list[FileListResponse],
@@ -187,6 +222,10 @@ def list_files(
         .order_by(File.name.asc())
     )
 
+    # --------------------------------------------------------
+    # Files inside a folder
+    # --------------------------------------------------------
+
     if folder_id:
         folder = db.scalar(
             select(Folder).where(
@@ -204,6 +243,10 @@ def list_files(
         query = query.where(
             File.folder_id == folder_id
         )
+
+    # --------------------------------------------------------
+    # Root files
+    # --------------------------------------------------------
 
     else:
         query = query.where(
@@ -228,15 +271,23 @@ def list_files(
         for file in files
     ]
 
+
+# ============================================================
+# VIEW / STREAM FILE CONTENT
+# ============================================================
+
 @router.get(
-    "/{file_id}/download",
-    response_model=FileDownloadResponse,
+    "/{file_id}/content",
 )
-def download_file(
+def get_file_content(
     file_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # --------------------------------------------------------
+    # Find file
+    # --------------------------------------------------------
+
     file_record = db.scalar(
         select(File).where(
             File.id == file_id,
@@ -250,6 +301,10 @@ def download_file(
             detail="File not found",
         )
 
+    # --------------------------------------------------------
+    # Permission check
+    # --------------------------------------------------------
+
     if not can_view(
         file_record,
         current_user,
@@ -260,6 +315,98 @@ def download_file(
             detail="File not found",
         )
 
+    # --------------------------------------------------------
+    # Retrieve actual file bytes from storage
+    # --------------------------------------------------------
+
+    try:
+        with urllib.request.urlopen(
+            file_record.storage_url,
+            timeout=30,
+        ) as storage_response:
+            file_content = storage_response.read()
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to retrieve file from storage",
+        ) from exc
+
+    # --------------------------------------------------------
+    # Return the original content type
+    #
+    # inline = browser should attempt to display the file
+    # --------------------------------------------------------
+
+    filename = (
+        file_record.name
+        .replace('"', "")
+        .replace("\r", "")
+        .replace("\n", "")
+    )
+
+    return Response(
+        content=file_content,
+        media_type=(
+            file_record.mime_type
+            or "application/octet-stream"
+        ),
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="{filename}"'
+            )
+        },
+    )
+
+
+# ============================================================
+# DOWNLOAD FILE
+# ============================================================
+
+@router.get(
+    "/{file_id}/download",
+    response_model=FileDownloadResponse,
+)
+def download_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # --------------------------------------------------------
+    # Find file
+    # --------------------------------------------------------
+
+    file_record = db.scalar(
+        select(File).where(
+            File.id == file_id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    # --------------------------------------------------------
+    # Permission check
+    # --------------------------------------------------------
+
+    if not can_view(
+        file_record,
+        current_user,
+        db,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    # --------------------------------------------------------
+    # Generate storage download URL
+    # --------------------------------------------------------
+
     download_url = get_download_url(
         public_id=file_record.storage_public_id,
         resource_type=file_record.resource_type,
@@ -269,6 +416,11 @@ def download_file(
         file_name=file_record.name,
         download_url=download_url,
     )
+
+
+# ============================================================
+# GET SINGLE FILE
+# ============================================================
 
 @router.get(
     "/{file_id}",
@@ -320,6 +472,11 @@ def get_file(
         is_deleted=file_record.is_deleted,
     )
 
+
+# ============================================================
+# RENAME FILE
+# ============================================================
+
 @router.patch(
     "/{file_id}",
     response_model=FileResponse,
@@ -361,6 +518,10 @@ def update_file(
             detail="File name cannot be empty",
         )
 
+    # --------------------------------------------------------
+    # Prevent duplicate names
+    # --------------------------------------------------------
+
     existing_file = db.scalar(
         select(File).where(
             File.owner_id == file_record.owner_id,
@@ -401,6 +562,10 @@ def update_file(
     )
 
 
+# ============================================================
+# MOVE FILE
+# ============================================================
+
 @router.patch(
     "/{file_id}/move",
     response_model=FileResponse,
@@ -434,6 +599,10 @@ def move_file(
             detail="You do not have permission to move this file",
         )
 
+    # --------------------------------------------------------
+    # Validate target folder
+    # --------------------------------------------------------
+
     if move_data.folder_id:
         target_folder = db.scalar(
             select(Folder).where(
@@ -447,6 +616,10 @@ def move_file(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Target folder not found",
             )
+
+    # --------------------------------------------------------
+    # Prevent duplicate file names
+    # --------------------------------------------------------
 
     existing_file = db.scalar(
         select(File).where(
@@ -463,6 +636,10 @@ def move_file(
             status_code=status.HTTP_409_CONFLICT,
             detail="A file with this name already exists in the target folder",
         )
+
+    # --------------------------------------------------------
+    # Move file
+    # --------------------------------------------------------
 
     file_record.folder_id = move_data.folder_id
 
@@ -486,6 +663,12 @@ def move_file(
         ),
         is_deleted=file_record.is_deleted,
     )
+
+
+# ============================================================
+# MOVE FILE TO TRASH
+# ============================================================
+
 @router.delete(
     "/{file_id}",
     status_code=status.HTTP_204_NO_CONTENT,
