@@ -6,6 +6,12 @@ import {
   Trash2,
   Loader2,
   ChevronDown,
+  Link,
+  Copy,
+  CheckCircle2,
+  Globe,
+  Lock,
+  Calendar,
 } from "lucide-react";
 
 import {
@@ -14,6 +20,7 @@ import {
 } from "react";
 
 import shareService from "../services/shareService";
+import publicLinkService from "../services/publicLinkService";
 
 
 const ShareModal = ({
@@ -47,38 +54,74 @@ const ShareModal = ({
 
 
   // ==========================================================
-  // LOAD EXISTING SHARES
+  // PUBLIC LINK STATES
   // ==========================================================
 
-  const loadShares = async () => {
+  const [publicLink, setPublicLink] =
+    useState(null);
+
+  const [linkLoading, setLinkLoading] =
+    useState(false);
+
+  const [copied, setCopied] =
+    useState(false);
+
+  const [password, setPassword] =
+    useState("");
+
+  const [expiry, setExpiry] =
+    useState("");
+
+
+  // ==========================================================
+  // LOAD SHARES + PUBLIC LINK
+  // ==========================================================
+
+  const loadData = async () => {
 
     if (!file?.id) {
       return;
     }
 
-
     setLoading(true);
     setError("");
 
-
     try {
 
-      const data =
-        await shareService.getFileShares(
+      const [
+        shareData,
+        links,
+      ] = await Promise.all([
+        shareService.getFileShares(
           file.id
-        );
+        ),
+        publicLinkService.getPublicLinks(),
+      ]);
 
       setShares(
-        Array.isArray(data)
-          ? data
+        Array.isArray(shareData)
+          ? shareData
           : []
+      );
+
+      const existing =
+        Array.isArray(links)
+          ? links.find(
+              (item) =>
+                item.file_id === file.id &&
+                item.is_active
+            )
+          : null;
+
+      setPublicLink(
+        existing || null
       );
 
     } catch (err) {
 
       setError(
         err.message ||
-          "Unable to load shares"
+          "Unable to load sharing information"
       );
 
     } finally {
@@ -90,12 +133,12 @@ const ShareModal = ({
 
 
   useEffect(() => {
-    loadShares();
+    loadData();
   }, [file?.id]);
 
 
   // ==========================================================
-  // CREATE SHARE
+  // SHARE FILE
   // ==========================================================
 
   const handleShare = async (
@@ -104,10 +147,8 @@ const ShareModal = ({
 
     event.preventDefault();
 
-
     const trimmedEmail =
       email.trim();
-
 
     if (!trimmedEmail) {
       setError(
@@ -116,11 +157,9 @@ const ShareModal = ({
       return;
     }
 
-
+    setSharing(true);
     setError("");
     setSuccess("");
-    setSharing(true);
-
 
     try {
 
@@ -130,15 +169,13 @@ const ShareModal = ({
         role
       );
 
-
       setEmail("");
 
       setSuccess(
-        "File shared successfully"
+        `${file.name} was shared with ${trimmedEmail}`
       );
 
-
-      await loadShares();
+      await loadData();
 
     } catch (err) {
 
@@ -163,18 +200,9 @@ const ShareModal = ({
     share
   ) => {
 
-    if (!share?.id) {
-      return;
-    }
-
-
     setRemovingId(
       share.id
     );
-
-    setError("");
-    setSuccess("");
-
 
     try {
 
@@ -182,19 +210,16 @@ const ShareModal = ({
         share.id
       );
 
-
       setShares(
         (current) =>
           current.filter(
             (item) =>
-              item.id !==
-              share.id
+              item.id !== share.id
           )
       );
 
-
       setSuccess(
-        "Access removed"
+        "Access removed successfully"
       );
 
     } catch (err) {
@@ -221,15 +246,6 @@ const ShareModal = ({
     newRole
   ) => {
 
-    if (!share?.id) {
-      return;
-    }
-
-
-    setError("");
-    setSuccess("");
-
-
     try {
 
       const updated =
@@ -238,21 +254,18 @@ const ShareModal = ({
           newRole
         );
 
-
       setShares(
         (current) =>
           current.map(
             (item) =>
-              item.id ===
-              share.id
+              item.id === share.id
                 ? updated
                 : item
           )
       );
 
-
       setSuccess(
-        "Permission updated"
+        "Permission updated successfully"
       );
 
     } catch (err) {
@@ -261,6 +274,122 @@ const ShareModal = ({
         err.message ||
           "Unable to update permission"
       );
+
+    }
+  };
+
+
+  // ==========================================================
+  // CREATE PUBLIC LINK
+  // ==========================================================
+
+  const handleCreateLink =
+    async () => {
+
+      setLinkLoading(true);
+      setError("");
+      setSuccess("");
+
+      try {
+
+        const data =
+          await publicLinkService.createFileLink(
+            file.id,
+            {
+              password:
+                password || null,
+
+              expires_at:
+                expiry
+                  ? new Date(expiry).toISOString()
+                  : null,
+            }
+          );
+
+        setPublicLink(data);
+
+        setSuccess(
+          "Public link created successfully"
+        );
+
+      } catch (err) {
+
+        setError(
+          err.message ||
+            "Unable to create public link"
+        );
+
+      } finally {
+
+        setLinkLoading(false);
+
+      }
+    };
+
+
+  // ==========================================================
+  // COPY LINK
+  // ==========================================================
+
+  const handleCopy = async () => {
+
+    if (!publicLink) {
+      return;
+    }
+
+    const url =
+      `${window.location.origin}/public/${publicLink.token}`;
+
+    await navigator.clipboard.writeText(
+      url
+    );
+
+    setCopied(true);
+
+    setTimeout(() => {
+      setCopied(false);
+    }, 1800);
+  };
+
+
+  // ==========================================================
+  // REVOKE LINK
+  // ==========================================================
+
+  const handleRevoke = async () => {
+
+    if (!publicLink) {
+      return;
+    }
+
+    setLinkLoading(true);
+
+    try {
+
+      await publicLinkService.revokeLink(
+        publicLink.id
+      );
+
+      setPublicLink(null);
+
+      setPassword("");
+      setExpiry("");
+
+      setSuccess(
+        "Public link revoked"
+      );
+
+    } catch (err) {
+
+      setError(
+        err.message ||
+          "Unable to revoke link"
+      );
+
+    } finally {
+
+      setLinkLoading(false);
+
     }
   };
 
@@ -274,44 +403,34 @@ const ShareModal = ({
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
       onMouseDown={(event) => {
-
         if (
           event.target ===
           event.currentTarget
         ) {
           onClose();
         }
-
       }}
     >
 
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
 
-        {/* ==================================================
-            HEADER
-            ================================================== */}
+        {/* HEADER */}
 
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
 
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex items-center gap-3">
 
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-
-              <Share2 size={20} />
-
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+              <Share2 size={21} />
             </div>
 
-
-            <div className="min-w-0">
+            <div>
 
               <h2 className="font-semibold text-slate-900">
                 Share file
               </h2>
 
-              <p
-                className="max-w-[300px] truncate text-xs text-slate-400"
-                title={file.name}
-              >
+              <p className="max-w-[300px] truncate text-xs text-slate-400">
                 {file.name}
               </p>
 
@@ -319,11 +438,9 @@ const ShareModal = ({
 
           </div>
 
-
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            title="Close"
+            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
             <X size={20} />
           </button>
@@ -331,15 +448,9 @@ const ShareModal = ({
         </div>
 
 
-        {/* ==================================================
-            BODY
-            ================================================== */}
+        <div className="max-h-[75vh] space-y-6 overflow-y-auto p-6">
 
-        <div className="max-h-[70vh] overflow-y-auto p-5">
-
-          {/* =================================================
-              SHARE FORM
-              ================================================= */}
+          {/* ADD PEOPLE */}
 
           <form
             onSubmit={handleShare}
@@ -348,30 +459,25 @@ const ShareModal = ({
 
             <div>
 
-              <label className="mb-2 block text-sm font-medium text-slate-700">
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
                 Add people
               </label>
-
 
               <div className="relative">
 
                 <Mail
                   size={17}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="absolute left-3 top-3.5 text-slate-400"
                 />
-
 
                 <input
                   type="email"
                   value={email}
-                  onChange={(event) =>
-                    setEmail(
-                      event.target.value
-                    )
+                  onChange={(e) =>
+                    setEmail(e.target.value)
                   }
                   placeholder="Enter email address"
-                  className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-                  disabled={sharing}
+                  className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
                 />
 
               </div>
@@ -379,26 +485,20 @@ const ShareModal = ({
             </div>
 
 
-            {/* PERMISSION */}
-
             <div>
 
-              <label className="mb-2 block text-sm font-medium text-slate-700">
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
                 Permission
               </label>
-
 
               <div className="relative">
 
                 <select
                   value={role}
-                  onChange={(event) =>
-                    setRole(
-                      event.target.value
-                    )
+                  onChange={(e) =>
+                    setRole(e.target.value)
                   }
-                  disabled={sharing}
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-3 pr-10 text-sm text-slate-700 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                  className="w-full appearance-none rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none"
                 >
 
                   <option value="viewer">
@@ -411,10 +511,9 @@ const ShareModal = ({
 
                 </select>
 
-
                 <ChevronDown
                   size={17}
-                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="pointer-events-none absolute right-3 top-3.5 text-slate-400"
                 />
 
               </div>
@@ -423,112 +522,100 @@ const ShareModal = ({
 
 
             <button
-              type="submit"
-              disabled={
-                sharing ||
-                !email.trim()
-              }
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={sharing}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
             >
 
-              {sharing ? (
-                <>
-                  <Loader2
-                    size={17}
-                    className="animate-spin"
-                  />
-
-                  Sharing...
-                </>
-              ) : (
-                <>
-                  <Share2 size={17} />
-
-                  Share
-                </>
-              )}
+              {sharing
+                ? (
+                  <>
+                    <Loader2
+                      size={17}
+                      className="animate-spin"
+                    />
+                    Sharing...
+                  </>
+                )
+                : (
+                  <>
+                    <Share2 size={17} />
+                    Share
+                  </>
+                )}
 
             </button>
 
           </form>
 
 
-          {/* =================================================
-              STATUS
-              ================================================= */}
+          {/* STATUS */}
 
           {error && (
-            <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-600">
               {error}
             </div>
           )}
 
-
           {success && (
-            <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-600">
-              {success}
+            <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-700">
+
+              <CheckCircle2
+                size={20}
+                className="mt-0.5"
+              />
+
+              <span>
+                {success}
+              </span>
+
             </div>
           )}
 
 
-          {/* =================================================
-              PEOPLE WITH ACCESS
-              ================================================= */}
+          {/* PEOPLE ACCESS */}
 
-          <div className="mt-6">
+          <div>
 
             <div className="mb-3 flex items-center justify-between">
 
-              <h3 className="text-sm font-semibold text-slate-800">
-                People with access
-              </h3>
+              <div>
 
+                <h3 className="font-semibold text-slate-800">
+                  People with access
+                </h3>
 
-              {!loading && (
-                <span className="text-xs text-slate-400">
-                  {shares.length}{" "}
-                  {shares.length === 1
-                    ? "person"
-                    : "people"}
-                </span>
-              )}
+                <p className="text-xs text-slate-400">
+                  Manage file permissions
+                </p>
+
+              </div>
+
+              <span className="text-xs text-slate-400">
+                {shares.length}
+              </span>
 
             </div>
 
 
             {loading ? (
 
-              <div className="flex items-center justify-center rounded-xl border border-slate-100 py-8">
-
+              <div className="flex justify-center py-8">
                 <Loader2
-                  size={22}
                   className="animate-spin text-slate-400"
                 />
-
               </div>
 
             ) : shares.length === 0 ? (
 
-              <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
+              <div className="rounded-2xl border border-dashed border-slate-200 py-8 text-center">
 
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
-
-                  <User
-                    size={18}
-                    className="text-slate-400"
-                  />
-
-                </div>
-
+                <User
+                  className="mx-auto text-slate-300"
+                  size={28}
+                />
 
                 <p className="mt-3 text-sm font-medium text-slate-600">
-                  Not shared yet
-                </p>
-
-
-                <p className="mt-1 text-xs text-slate-400">
-                  Add someone above to give
-                  them access.
+                  No one has access yet
                 </p>
 
               </div>
@@ -541,50 +628,32 @@ const ShareModal = ({
 
                   <div
                     key={share.id}
-                    className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-3"
+                    className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3"
                   >
 
-                    {/* AVATAR */}
-
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-slate-600 shadow-sm">
-
-                      {(
-                        share.email ||
-                        "U"
-                      )
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white font-semibold text-slate-600">
+                      {share.email
                         .charAt(0)
                         .toUpperCase()}
-
                     </div>
-
-
-                    {/* EMAIL */}
 
                     <div className="min-w-0 flex-1">
 
-                      <p
-                        className="truncate text-sm font-medium text-slate-700"
-                        title={share.email}
-                      >
+                      <p className="truncate text-sm font-medium text-slate-700">
                         {share.email}
                       </p>
 
                     </div>
 
-
-                    {/* ROLE */}
-
                     <select
-                      value={
-                        share.role
-                      }
-                      onChange={(event) =>
+                      value={share.role}
+                      onChange={(e) =>
                         handleRoleChange(
                           share,
-                          event.target.value
+                          e.target.value
                         )
                       }
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-600 outline-none"
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
                     >
 
                       <option value="viewer">
@@ -597,40 +666,197 @@ const ShareModal = ({
 
                     </select>
 
-
-                    {/* REMOVE */}
-
                     <button
-                      onClick={() =>
-                        handleRemove(
-                          share
-                        )
-                      }
                       disabled={
-                        removingId ===
-                        share.id
+                        removingId === share.id
                       }
-                      className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-                      title="Remove access"
+                      onClick={() =>
+                        handleRemove(share)
+                      }
+                      className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500"
                     >
 
-                      {removingId ===
-                      share.id ? (
-                        <Loader2
-                          size={16}
-                          className="animate-spin"
-                        />
-                      ) : (
-                        <Trash2
-                          size={16}
-                        />
-                      )}
+                      {removingId === share.id
+                        ? (
+                          <Loader2
+                            size={16}
+                            className="animate-spin"
+                          />
+                        )
+                        : (
+                          <Trash2 size={16} />
+                        )}
 
                     </button>
 
                   </div>
 
                 ))}
+
+              </div>
+
+            )}
+
+          </div>
+
+
+          {/* PUBLIC LINK */}
+
+          <div className="border-t border-slate-200 pt-6">
+
+            <div className="mb-4 flex items-center gap-3">
+
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <Globe size={20} />
+              </div>
+
+              <div>
+
+                <h3 className="font-semibold text-slate-800">
+                  Public access
+                </h3>
+
+                <p className="text-xs text-slate-400">
+                  Anyone with the link can access
+                </p>
+
+              </div>
+
+            </div>
+
+
+            {!publicLink ? (
+
+              <div className="space-y-4">
+
+                <div>
+
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+
+                    <Lock size={15} />
+
+                    Password (optional)
+
+                  </label>
+
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) =>
+                      setPassword(e.target.value)
+                    }
+                    placeholder="Protect with password"
+                    className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-slate-400"
+                  />
+
+                </div>
+
+
+                <div>
+
+                  <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+
+                    <Calendar size={15} />
+
+                    Expiry (optional)
+
+                  </label>
+
+                  <input
+                    type="datetime-local"
+                    value={expiry}
+                    onChange={(e) =>
+                      setExpiry(e.target.value)
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-slate-400"
+                  />
+
+                </div>
+
+
+                <button
+                  onClick={handleCreateLink}
+                  disabled={linkLoading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-900 bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+
+                  {linkLoading
+                    ? (
+                      <>
+                        <Loader2
+                          size={17}
+                          className="animate-spin"
+                        />
+                        Creating...
+                      </>
+                    )
+                    : (
+                      <>
+                        <Link size={17} />
+                        Create public link
+                      </>
+                    )}
+
+                </button>
+
+              </div>
+
+            ) : (
+
+              <div className="space-y-3">
+
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+
+                  <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+
+                    <CheckCircle2 size={17} />
+
+                    Public link active
+
+                  </div>
+
+                  <p className="mt-2 break-all text-xs text-emerald-600">
+
+                    {`${window.location.origin}/public/${publicLink.token}`}
+
+                  </p>
+
+                </div>
+
+
+                <div className="flex gap-3">
+
+                  <button
+                    onClick={handleCopy}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+                  >
+
+                    {copied
+                      ? (
+                        <>
+                          <CheckCircle2 size={17} />
+                          Copied
+                        </>
+                      )
+                      : (
+                        <>
+                          <Copy size={17} />
+                          Copy link
+                        </>
+                      )}
+
+                  </button>
+
+
+                  <button
+                    onClick={handleRevoke}
+                    disabled={linkLoading}
+                    className="rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    Revoke
+                  </button>
+
+                </div>
 
               </div>
 
