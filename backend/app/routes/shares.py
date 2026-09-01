@@ -5,6 +5,7 @@ from fastapi import (
     Response,
     status,
 )
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,7 @@ from app.models.file import File
 from app.models.share import Share
 from app.models.user import User
 from app.models.folder import Folder
+from app.models.notification import Notification
 
 from app.schemas.share import (
     FolderShareCreateRequest,
@@ -47,6 +49,10 @@ def create_share(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # --------------------------------------------------------
+    # Verify file ownership
+    # --------------------------------------------------------
+
     file_record = db.scalar(
         select(File).where(
             File.id == file_id,
@@ -61,6 +67,10 @@ def create_share(
             detail="File not found",
         )
 
+    # --------------------------------------------------------
+    # Find target user
+    # --------------------------------------------------------
+
     target_user = db.scalar(
         select(User).where(
             User.email == share_data.email,
@@ -73,11 +83,19 @@ def create_share(
             detail="User not found",
         )
 
+    # --------------------------------------------------------
+    # Prevent sharing with yourself
+    # --------------------------------------------------------
+
     if target_user.id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot share a file with yourself",
         )
+
+    # --------------------------------------------------------
+    # Check existing share
+    # --------------------------------------------------------
 
     existing_share = db.scalar(
         select(Share).where(
@@ -92,6 +110,10 @@ def create_share(
             detail="File is already shared with this user",
         )
 
+    # --------------------------------------------------------
+    # Create share
+    # --------------------------------------------------------
+
     share = Share(
         file_id=file_record.id,
         folder_id=None,
@@ -100,8 +122,37 @@ def create_share(
     )
 
     db.add(share)
+
+    # --------------------------------------------------------
+    # Create notification
+    # --------------------------------------------------------
+
+    notification = Notification(
+        user_id=target_user.id,
+        type="file_shared",
+        title="New file shared",
+        message=(
+            f"{file_record.name} was shared with you "
+            f"as {share.role.title()}."
+        ),
+        file_id=file_record.id,
+        folder_id=None,
+        share_id=share.id,
+        is_read=False,
+    )
+
+    db.add(notification)
+
+    # --------------------------------------------------------
+    # Commit both together
+    # --------------------------------------------------------
+
     db.commit()
     db.refresh(share)
+
+    # --------------------------------------------------------
+    # Response
+    # --------------------------------------------------------
 
     return ShareResponse(
         id=str(share.id),
@@ -130,6 +181,10 @@ def create_folder_share(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # --------------------------------------------------------
+    # Verify folder ownership
+    # --------------------------------------------------------
+
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
@@ -143,6 +198,10 @@ def create_folder_share(
             detail="Folder not found",
         )
 
+    # --------------------------------------------------------
+    # Find target user
+    # --------------------------------------------------------
+
     target_user = db.scalar(
         select(User).where(
             User.email == folder_data.email,
@@ -155,11 +214,19 @@ def create_folder_share(
             detail="User not found",
         )
 
+    # --------------------------------------------------------
+    # Prevent sharing with yourself
+    # --------------------------------------------------------
+
     if target_user.id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot share a folder with yourself",
         )
+
+    # --------------------------------------------------------
+    # Check existing share
+    # --------------------------------------------------------
 
     existing_share = db.scalar(
         select(Share).where(
@@ -174,6 +241,10 @@ def create_folder_share(
             detail="Folder is already shared with this user",
         )
 
+    # --------------------------------------------------------
+    # Create share
+    # --------------------------------------------------------
+
     share = Share(
         folder_id=folder.id,
         file_id=None,
@@ -182,8 +253,37 @@ def create_folder_share(
     )
 
     db.add(share)
+
+    # --------------------------------------------------------
+    # Create notification
+    # --------------------------------------------------------
+
+    notification = Notification(
+        user_id=target_user.id,
+        type="folder_shared",
+        title="New folder shared",
+        message=(
+            f"{folder.name} was shared with you "
+            f"as {share.role.title()}."
+        ),
+        file_id=None,
+        folder_id=folder.id,
+        share_id=share.id,
+        is_read=False,
+    )
+
+    db.add(notification)
+
+    # --------------------------------------------------------
+    # Commit both together
+    # --------------------------------------------------------
+
     db.commit()
     db.refresh(share)
+
+    # --------------------------------------------------------
+    # Response
+    # --------------------------------------------------------
 
     return ShareResponse(
         id=str(share.id),
@@ -291,10 +391,11 @@ def list_shared_folders(
 # GET SHARES FOR A FILE
 #
 # Owner only.
-# Used by the Share dialog to show:
 #
-# user@example.com   Viewer
-# other@example.com  Editor
+# Used by Share dialog to show:
+#
+# user@example.com     Viewer
+# other@example.com    Editor
 #
 # ============================================================
 
@@ -373,7 +474,7 @@ def update_share(
     db: Session = Depends(get_db),
 ):
     # --------------------------------------------------------
-    # First try file share
+    # File share
     # --------------------------------------------------------
 
     share = db.scalar(

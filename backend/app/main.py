@@ -11,7 +11,7 @@ from app.routes.public_links import router as public_links_router
 from app.routes.search import router as search_router
 from app.routes.trash import router as trash_router
 from app.routes.health import router as health_router
-
+from app.routes.notifications import router as notifications_router
 
 app = FastAPI(
     title="Cloud Storage Service",
@@ -52,6 +52,7 @@ app.include_router(public_links_router)
 app.include_router(search_router)
 app.include_router(trash_router)
 app.include_router(health_router)
+app.include_router(notifications_router)
 
 @app.get("/")
 def root():
