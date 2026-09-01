@@ -10,10 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+
 from app.models.file import File
 from app.models.share import Share
 from app.models.user import User
 from app.models.folder import Folder
+
 from app.schemas.share import (
     FolderShareCreateRequest,
     ShareCreateRequest,
@@ -29,6 +31,10 @@ router = APIRouter(
     tags=["Sharing"],
 )
 
+
+# ============================================================
+# CREATE FILE SHARE
+# ============================================================
 
 @router.post(
     "",
@@ -88,6 +94,7 @@ def create_share(
 
     share = Share(
         file_id=file_record.id,
+        folder_id=None,
         shared_with_user_id=target_user.id,
         role=share_data.role.value,
     )
@@ -99,12 +106,18 @@ def create_share(
     return ShareResponse(
         id=str(share.id),
         file_id=str(share.file_id),
+        folder_id=None,
         shared_with_user_id=str(
             share.shared_with_user_id
         ),
         email=target_user.email,
         role=share.role,
     )
+
+
+# ============================================================
+# CREATE FOLDER SHARE
+# ============================================================
 
 @router.post(
     "/folders",
@@ -183,6 +196,11 @@ def create_folder_share(
         role=share.role,
     )
 
+
+# ============================================================
+# LIST FILES SHARED WITH CURRENT USER
+# ============================================================
+
 @router.get(
     "",
     response_model=list[SharedFileResponse],
@@ -225,6 +243,11 @@ def list_shared_files(
         for share, file in results
     ]
 
+
+# ============================================================
+# LIST FOLDERS SHARED WITH CURRENT USER
+# ============================================================
+
 @router.get(
     "/folders",
     response_model=list[SharedFolderResponse],
@@ -263,6 +286,82 @@ def list_shared_folders(
         for share, folder in results
     ]
 
+
+# ============================================================
+# GET SHARES FOR A FILE
+#
+# Owner only.
+# Used by the Share dialog to show:
+#
+# user@example.com   Viewer
+# other@example.com  Editor
+#
+# ============================================================
+
+@router.get(
+    "/file/{file_id}",
+    response_model=list[ShareResponse],
+)
+def list_file_shares(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # --------------------------------------------------------
+    # Verify file ownership
+    # --------------------------------------------------------
+
+    file_record = db.scalar(
+        select(File).where(
+            File.id == file_id,
+            File.owner_id == current_user.id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    if not file_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    # --------------------------------------------------------
+    # Get all shares
+    # --------------------------------------------------------
+
+    results = db.execute(
+        select(Share, User)
+        .join(
+            User,
+            Share.shared_with_user_id == User.id,
+        )
+        .where(
+            Share.file_id == file_record.id,
+        )
+        .order_by(
+            Share.created_at.asc()
+        )
+    ).all()
+
+    return [
+        ShareResponse(
+            id=str(share.id),
+            file_id=str(share.file_id),
+            folder_id=None,
+            shared_with_user_id=str(
+                share.shared_with_user_id
+            ),
+            email=user.email,
+            role=share.role,
+        )
+        for share, user in results
+    ]
+
+
+# ============================================================
+# UPDATE SHARE PERMISSION
+# ============================================================
+
 @router.patch(
     "/{share_id}",
     response_model=ShareResponse,
@@ -273,6 +372,10 @@ def update_share(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # --------------------------------------------------------
+    # First try file share
+    # --------------------------------------------------------
+
     share = db.scalar(
         select(Share)
         .join(
@@ -305,7 +408,16 @@ def update_share(
 
     return ShareResponse(
         id=str(share.id),
-        file_id=str(share.file_id),
+        file_id=(
+            str(share.file_id)
+            if share.file_id
+            else None
+        ),
+        folder_id=(
+            str(share.folder_id)
+            if share.folder_id
+            else None
+        ),
         shared_with_user_id=str(
             share.shared_with_user_id
         ),
@@ -313,6 +425,10 @@ def update_share(
         role=share.role,
     )
 
+
+# ============================================================
+# DELETE SHARE
+# ============================================================
 
 @router.delete(
     "/{share_id}",
@@ -323,6 +439,10 @@ def delete_share(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # --------------------------------------------------------
+    # File share
+    # --------------------------------------------------------
+
     share = db.scalar(
         select(Share)
         .join(
