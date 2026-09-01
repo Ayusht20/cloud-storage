@@ -22,6 +22,7 @@ import Layout from "../components/Layout";
 import FolderCard from "../components/FolderCard";
 import FileCard from "../components/FileCard";
 import FilePreviewModal from "../components/FilePreviewModal";
+import ShareModal from "../components/ShareModal";
 
 import fileService from "../services/fileService";
 import folderService from "../services/folderService";
@@ -69,6 +70,14 @@ const Dashboard = () => {
 
   const [previewLoading, setPreviewLoading] =
     useState(false);
+
+
+  // ==================================================
+  // SHARE MODAL
+  // ==================================================
+
+  const [shareFile, setShareFile] =
+    useState(null);
 
 
   // ==================================================
@@ -355,6 +364,21 @@ const handleDownload = async (
 
   }
 };
+
+
+  // ==================================================
+  // SHARE
+  // ==================================================
+
+  const handleShare = (file) => {
+    setError("");
+    setShareFile(file);
+  };
+
+
+  const handleCloseShare = () => {
+    setShareFile(null);
+  };
 
 
   // ==================================================
@@ -1080,6 +1104,9 @@ const handleDownload = async (
                         onMove={
                           handleMove
                         }
+                        onShare={
+                          handleShare
+                        }
                         onDelete={
                           handleDeleteFile
                         }
@@ -1126,6 +1153,18 @@ const handleDownload = async (
           onDownload={
             handleDownload
           }
+        />
+      )}
+
+
+      {/* ==================================================
+          SHARE MODAL
+          ================================================== */}
+
+      {shareFile && (
+        <ShareModal
+          file={shareFile}
+          onClose={handleCloseShare}
         />
       )}
 
