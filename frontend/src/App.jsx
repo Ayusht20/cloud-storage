@@ -11,7 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Shared from "./pages/Shared";
 
 import ProtectedRoute from "./components/ProtectedRoute";
-
+import PublicFile from "./pages/PublicFile";
 
 const App = () => {
   return (
@@ -50,7 +50,10 @@ const App = () => {
             </ProtectedRoute>
           }
         />
-
+        <Route
+  path="/public/:token"
+  element={<PublicFile />}
+/>
 
         <Route
           path="/shared"
