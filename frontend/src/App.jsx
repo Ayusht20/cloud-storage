@@ -11,7 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import PublicFile from "./pages/PublicFile";
 
 import ProtectedRoute from "./components/ProtectedRoute";
-
+import Shared from "./pages/Shared";
 
 const App = () => {
   return (
@@ -33,6 +33,14 @@ const App = () => {
           path="/login"
           element={<Login />}
         />
+        <Route
+  path="/shared"
+  element={
+    <ProtectedRoute>
+      <Shared />
+    </ProtectedRoute>
+  }
+/>
 
         <Route
           path="/register"
@@ -47,6 +55,7 @@ const App = () => {
               <Dashboard />
             </ProtectedRoute>
           }
+          
         />
 
         {/* PUBLIC — NO ProtectedRoute */}
