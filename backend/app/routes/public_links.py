@@ -12,7 +12,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.core.security import hash_password, verify_password
+from app.core.security import (
+    hash_password,
+    verify_password,
+)
 
 from app.models.file import File
 from app.models.folder import Folder
@@ -28,9 +31,33 @@ from app.schemas.public_link import (
 
 from app.services.storage_service import get_download_url
 
+
+# ============================================================
+# AUTHENTICATED PUBLIC LINK MANAGEMENT
+# ============================================================
+
 router = APIRouter(
     prefix="/public-links",
     tags=["Public Links"],
+)
+
+
+# ============================================================
+# PUBLIC LINK ACCESS
+#
+# IMPORTANT:
+# This router intentionally has NO prefix.
+#
+# Public URLs are:
+#
+# POST /public/{token}
+# POST /public/{token}/contents
+#
+# These endpoints do NOT require login.
+# ============================================================
+
+public_access_router = APIRouter(
+    tags=["Public Access"],
 )
 
 
@@ -102,6 +129,12 @@ def verify_public_link_password(
 
 # ============================================================
 # CREATE PUBLIC LINK
+#
+# POST /public-links?file_id=<UUID>
+#
+# OR
+#
+# POST /public-links?folder_id=<UUID>
 # ============================================================
 
 @router.post(
@@ -132,7 +165,7 @@ def create_public_link(
         )
 
     # --------------------------------------------------------
-    # File link
+    # Validate file
     # --------------------------------------------------------
 
     if file_id:
@@ -140,8 +173,7 @@ def create_public_link(
         file = db.scalar(
             select(File).where(
                 File.id == file_id,
-                File.owner_id ==
-                current_user.id,
+                File.owner_id == current_user.id,
                 File.is_deleted.is_(False),
             )
         )
@@ -153,7 +185,7 @@ def create_public_link(
             )
 
     # --------------------------------------------------------
-    # Folder link
+    # Validate folder
     # --------------------------------------------------------
 
     if folder_id:
@@ -161,8 +193,7 @@ def create_public_link(
         folder = db.scalar(
             select(Folder).where(
                 Folder.id == folder_id,
-                Folder.owner_id ==
-                current_user.id,
+                Folder.owner_id == current_user.id,
                 Folder.is_deleted.is_(False),
             )
         )
@@ -174,12 +205,12 @@ def create_public_link(
             )
 
     # --------------------------------------------------------
-    # Validate expiry
+    # Validate expiration
     # --------------------------------------------------------
 
-    if link_data.expires_at is not None:
+    expires_at = link_data.expires_at
 
-        expires_at = link_data.expires_at
+    if expires_at is not None:
 
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(
@@ -191,7 +222,9 @@ def create_public_link(
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Expiration must be in the future",
+                detail=(
+                    "Expiration must be in the future"
+                ),
             )
 
     # --------------------------------------------------------
@@ -209,11 +242,13 @@ def create_public_link(
         file_id=file_id,
         folder_id=folder_id,
         password_hash=(
-            hash_password(link_data.password)
+            hash_password(
+                link_data.password
+            )
             if link_data.password
             else None
         ),
-        expires_at=link_data.expires_at,
+        expires_at=expires_at,
         is_active=True,
     )
 
@@ -221,6 +256,10 @@ def create_public_link(
 
     db.commit()
     db.refresh(public_link)
+
+    # --------------------------------------------------------
+    # Response
+    # --------------------------------------------------------
 
     return PublicLinkResponse(
         id=str(public_link.id),
@@ -243,6 +282,8 @@ def create_public_link(
 
 # ============================================================
 # LIST MY PUBLIC LINKS
+#
+# GET /public-links
 # ============================================================
 
 @router.get(
@@ -268,13 +309,11 @@ def list_public_links(
         )
         .where(
             (
-                File.owner_id ==
-                current_user.id
+                File.owner_id == current_user.id
             )
             |
             (
-                Folder.owner_id ==
-                current_user.id
+                Folder.owner_id == current_user.id
             )
         )
         .order_by(
@@ -306,6 +345,8 @@ def list_public_links(
 
 # ============================================================
 # REVOKE PUBLIC LINK
+#
+# DELETE /public-links/{link_id}
 # ============================================================
 
 @router.delete(
@@ -333,13 +374,11 @@ def revoke_public_link(
         .where(
             PublicLink.id == link_id,
             (
-                File.owner_id ==
-                current_user.id
+                File.owner_id == current_user.id
             )
             |
             (
-                Folder.owner_id ==
-                current_user.id
+                Folder.owner_id == current_user.id
             ),
         )
     )
@@ -358,10 +397,14 @@ def revoke_public_link(
 
 
 # ============================================================
-# ACCESS PUBLIC FILE / FOLDER
+# PUBLIC FILE / FOLDER ACCESS
+#
+# POST /public/{token}
+#
+# NO LOGIN REQUIRED
 # ============================================================
 
-@router.post(
+@public_access_router.post(
     "/public/{token}",
 )
 def access_public_link(
@@ -387,15 +430,14 @@ def access_public_link(
     )
 
     # --------------------------------------------------------
-    # File
+    # FILE
     # --------------------------------------------------------
 
     if public_link.file_id:
 
         file = db.scalar(
             select(File).where(
-                File.id ==
-                public_link.file_id,
+                File.id == public_link.file_id,
                 File.is_deleted.is_(False),
             )
         )
@@ -420,15 +462,14 @@ def access_public_link(
         )
 
     # --------------------------------------------------------
-    # Folder
+    # FOLDER
     # --------------------------------------------------------
 
     if public_link.folder_id:
 
         folder = db.scalar(
             select(Folder).where(
-                Folder.id ==
-                public_link.folder_id,
+                Folder.id == public_link.folder_id,
                 Folder.is_deleted.is_(False),
             )
         )
@@ -453,9 +494,13 @@ def access_public_link(
 
 # ============================================================
 # PUBLIC FOLDER CONTENTS
+#
+# POST /public/{token}/contents
+#
+# NO LOGIN REQUIRED
 # ============================================================
 
-@router.post(
+@public_access_router.post(
     "/public/{token}/contents",
 )
 def get_public_folder_contents(
@@ -480,6 +525,10 @@ def get_public_folder_contents(
         password,
     )
 
+    # --------------------------------------------------------
+    # Verify folder link
+    # --------------------------------------------------------
+
     if not public_link.folder_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -488,10 +537,13 @@ def get_public_folder_contents(
             ),
         )
 
+    # --------------------------------------------------------
+    # Get folder
+    # --------------------------------------------------------
+
     folder = db.scalar(
         select(Folder).where(
-            Folder.id ==
-            public_link.folder_id,
+            Folder.id == public_link.folder_id,
             Folder.is_deleted.is_(False),
         )
     )
@@ -501,6 +553,10 @@ def get_public_folder_contents(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Folder not found",
         )
+
+    # --------------------------------------------------------
+    # Get subfolders
+    # --------------------------------------------------------
 
     folders = db.scalars(
         select(Folder)
@@ -514,6 +570,10 @@ def get_public_folder_contents(
         )
     ).all()
 
+    # --------------------------------------------------------
+    # Get files
+    # --------------------------------------------------------
+
     files = db.scalars(
         select(File)
         .where(
@@ -525,6 +585,10 @@ def get_public_folder_contents(
             File.name.asc()
         )
     ).all()
+
+    # --------------------------------------------------------
+    # Response
+    # --------------------------------------------------------
 
     return {
         "folder": {

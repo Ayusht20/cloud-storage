@@ -8,10 +8,10 @@ import {
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-import Shared from "./pages/Shared";
+import PublicFile from "./pages/PublicFile";
 
 import ProtectedRoute from "./components/ProtectedRoute";
-import PublicFile from "./pages/PublicFile";
+
 
 const App = () => {
   return (
@@ -29,19 +29,17 @@ const App = () => {
           }
         />
 
-
         <Route
           path="/login"
           element={<Login />}
         />
-
 
         <Route
           path="/register"
           element={<Register />}
         />
 
-
+        {/* PRIVATE */}
         <Route
           path="/dashboard"
           element={
@@ -50,20 +48,12 @@ const App = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-  path="/public/:token"
-  element={<PublicFile />}
-/>
 
+        {/* PUBLIC — NO ProtectedRoute */}
         <Route
-          path="/shared"
-          element={
-            <ProtectedRoute>
-              <Shared />
-            </ProtectedRoute>
-          }
+          path="/public/:token"
+          element={<PublicFile />}
         />
-
 
         <Route
           path="*"

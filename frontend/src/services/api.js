@@ -3,6 +3,10 @@ const API_BASE_URL =
   "http://127.0.0.1:8000";
 
 
+// ============================================================
+// REDIRECT TO LOGIN
+// ============================================================
+
 const redirectToLogin = () => {
   if (
     window.location.pathname !==
@@ -15,6 +19,21 @@ const redirectToLogin = () => {
 
 
 // ============================================================
+// CHECK PUBLIC ENDPOINT
+// ============================================================
+
+const isPublicEndpoint = (
+  endpoint
+) => {
+
+  return (
+    endpoint.startsWith("/public/")
+  );
+
+};
+
+
+// ============================================================
 // JSON REQUEST
 // ============================================================
 
@@ -22,6 +41,7 @@ const request = async (
   endpoint,
   options = {}
 ) => {
+
   const isFormData =
     options.body instanceof FormData;
 
@@ -50,9 +70,17 @@ const request = async (
 
   // ----------------------------------------------------------
   // AUTOMATIC UNAUTHORIZED HANDLING
+  //
+  // IMPORTANT:
+  // Public links can intentionally return 401 when a password
+  // is required or when the supplied password is incorrect.
+  // Therefore public endpoints must NOT redirect to login.
   // ----------------------------------------------------------
 
-  if (response.status === 401) {
+  if (
+    response.status === 401 &&
+    !isPublicEndpoint(endpoint)
+  ) {
 
     redirectToLogin();
 
@@ -67,16 +95,28 @@ const request = async (
   }
 
 
+  // ----------------------------------------------------------
+  // READ RESPONSE
+  // ----------------------------------------------------------
+
   let data = null;
 
 
   try {
+
     data =
       await response.json();
+
   } catch {
+
     data = null;
+
   }
 
+
+  // ----------------------------------------------------------
+  // ERROR HANDLING
+  // ----------------------------------------------------------
 
   if (!response.ok) {
 
@@ -124,9 +164,15 @@ const requestBlob = async (
 
   // ----------------------------------------------------------
   // AUTOMATIC UNAUTHORIZED HANDLING
+  //
+  // Public endpoints must be allowed to return 401 without
+  // redirecting the visitor to the login page.
   // ----------------------------------------------------------
 
-  if (response.status === 401) {
+  if (
+    response.status === 401 &&
+    !isPublicEndpoint(endpoint)
+  ) {
 
     redirectToLogin();
 
@@ -140,6 +186,10 @@ const requestBlob = async (
     throw error;
   }
 
+
+  // ----------------------------------------------------------
+  // ERROR HANDLING
+  // ----------------------------------------------------------
 
   if (!response.ok) {
 
@@ -186,12 +236,14 @@ const api = {
   // ----------------------------------------------------------
 
   get(endpoint) {
+
     return request(
       endpoint,
       {
         method: "GET",
       }
     );
+
   },
 
 
@@ -200,12 +252,14 @@ const api = {
   // ----------------------------------------------------------
 
   getBlob(endpoint) {
+
     return requestBlob(
       endpoint,
       {
         method: "GET",
       }
     );
+
   },
 
 
@@ -229,6 +283,7 @@ const api = {
             : JSON.stringify(body),
       }
     );
+
   },
 
 
@@ -250,6 +305,7 @@ const api = {
           JSON.stringify(body),
       }
     );
+
   },
 
 
@@ -265,6 +321,7 @@ const api = {
         method: "DELETE",
       }
     );
+
   },
 
 };

@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Download,
   File,
   FileText,
@@ -23,6 +22,10 @@ import {
 
 import publicLinkService from "../services/publicLinkService";
 
+
+// ============================================================
+// FORMAT FILE SIZE
+// ============================================================
 
 const formatSize = (size) => {
   if (!size) {
@@ -55,16 +58,26 @@ const formatSize = (size) => {
 };
 
 
+// ============================================================
+// FILE ICON
+// ============================================================
+
 const getFileIcon = (mimeType) => {
-  if (mimeType?.startsWith("image/")) {
+  if (
+    mimeType?.startsWith("image/")
+  ) {
     return Image;
   }
 
-  if (mimeType?.startsWith("video/")) {
+  if (
+    mimeType?.startsWith("video/")
+  ) {
     return Video;
   }
 
-  if (mimeType?.startsWith("audio/")) {
+  if (
+    mimeType?.startsWith("audio/")
+  ) {
     return Music;
   }
 
@@ -79,10 +92,22 @@ const getFileIcon = (mimeType) => {
 };
 
 
-const PublicFile = () => {
-  const { token } = useParams();
+// ============================================================
+// PUBLIC FILE
+// ============================================================
 
-  const navigate = useNavigate();
+const PublicFile = () => {
+
+  const { token } =
+    useParams();
+
+  const navigate =
+    useNavigate();
+
+
+  // ==========================================================
+  // STATE
+  // ==========================================================
 
   const [file, setFile] =
     useState(null);
@@ -104,24 +129,37 @@ const PublicFile = () => {
 
 
   // ==========================================================
-  // ACCESS LINK
+  // ACCESS PUBLIC LINK
   // ==========================================================
 
   const loadPublicFile = async (
     providedPassword = null
   ) => {
+
     setLoading(true);
+
     setError("");
+
     setPasswordError("");
 
+
     try {
+
       const data =
         await publicLinkService.accessLink(
           token,
           providedPassword
         );
 
-      if (data?.type === "folder") {
+
+      // ------------------------------------------------------
+      // PUBLIC FOLDER
+      // ------------------------------------------------------
+
+      if (
+        data?.type === "folder"
+      ) {
+
         navigate(
           `/public/${token}/folder`,
           {
@@ -132,31 +170,97 @@ const PublicFile = () => {
         return;
       }
 
+
+      // ------------------------------------------------------
+      // PUBLIC FILE
+      // ------------------------------------------------------
+
       setFile(data);
 
       setRequiresPassword(false);
 
     } catch (err) {
 
+      console.log(
+        "PUBLIC LINK ERROR:",
+        err.status,
+        err.message,
+        err.data
+      );
+
+
+      // ------------------------------------------------------
+      // PASSWORD REQUIRED / INVALID PASSWORD
+      // ------------------------------------------------------
+
       if (
-        err.status === 401 &&
-        !providedPassword
+        err.status === 401
       ) {
+
+        // First request:
+        // No password was provided.
+        //
+        // Backend response:
+        // "Password required"
+
+        if (!providedPassword) {
+
+          setRequiresPassword(true);
+
+          return;
+        }
+
+
+        // Password was provided but
+        // backend rejected it.
+
+        setPasswordError(
+          err.message ||
+            "Invalid password"
+        );
+
         setRequiresPassword(true);
+
         return;
       }
 
+
+      // ------------------------------------------------------
+      // EXPIRED LINK
+      // ------------------------------------------------------
+
       if (
-        err.status === 401 &&
-        providedPassword
+        err.status === 410
       ) {
-        setPasswordError(
-          err.message ||
-            "Incorrect password"
+
+        setError(
+          "This public link has expired."
         );
 
         return;
       }
+
+
+      // ------------------------------------------------------
+      // NOT FOUND
+      // ------------------------------------------------------
+
+      if (
+        err.status === 404
+      ) {
+
+        setError(
+          err.message ||
+            "This public link is no longer available."
+        );
+
+        return;
+      }
+
+
+      // ------------------------------------------------------
+      // OTHER ERROR
+      // ------------------------------------------------------
 
       setError(
         err.message ||
@@ -164,15 +268,23 @@ const PublicFile = () => {
       );
 
     } finally {
+
       setLoading(false);
+
     }
   };
 
 
+  // ==========================================================
+  // INITIAL LOAD
+  // ==========================================================
+
   useEffect(() => {
+
     if (token) {
       loadPublicFile();
     }
+
   }, [token]);
 
 
@@ -183,15 +295,19 @@ const PublicFile = () => {
   const handlePasswordSubmit = async (
     event
   ) => {
+
     event.preventDefault();
 
+
     if (!password.trim()) {
+
       setPasswordError(
         "Please enter the password"
       );
 
       return;
     }
+
 
     await loadPublicFile(
       password
@@ -204,9 +320,13 @@ const PublicFile = () => {
   // ==========================================================
 
   const handleDownload = () => {
-    if (!file?.download_url) {
+
+    if (
+      !file?.download_url
+    ) {
       return;
     }
+
 
     window.open(
       file.download_url,
@@ -221,6 +341,7 @@ const PublicFile = () => {
   // ==========================================================
 
   if (loading) {
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
 
@@ -247,16 +368,22 @@ const PublicFile = () => {
   // ==========================================================
 
   if (requiresPassword) {
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
 
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+
+          {/* ICON */}
 
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
 
             <Lock size={25} />
 
           </div>
+
+
+          {/* TITLE */}
 
           <div className="mt-5 text-center">
 
@@ -270,6 +397,9 @@ const PublicFile = () => {
             </p>
 
           </div>
+
+
+          {/* FORM */}
 
           <form
             onSubmit={
@@ -288,8 +418,11 @@ const PublicFile = () => {
               }
               placeholder="Enter password"
               autoFocus
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-slate-400"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
             />
+
+
+            {/* PASSWORD ERROR */}
 
             {passwordError && (
               <p className="text-sm text-red-500">
@@ -297,10 +430,13 @@ const PublicFile = () => {
               </p>
             )}
 
+
+            {/* SUBMIT */}
+
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+              className="flex w-full items-center justify-center rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Access file
             </button>
@@ -319,30 +455,44 @@ const PublicFile = () => {
   // ==========================================================
 
   if (error) {
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
 
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl">
 
+          {/* ICON */}
+
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
 
-            <AlertCircle size={26} />
+            <AlertCircle
+              size={26}
+            />
 
           </div>
+
+
+          {/* TITLE */}
 
           <h1 className="mt-5 text-xl font-bold text-slate-900">
             Unable to access file
           </h1>
 
+
+          {/* MESSAGE */}
+
           <p className="mt-2 text-sm text-slate-500">
             {error}
           </p>
+
+
+          {/* HOME */}
 
           <button
             onClick={() =>
               navigate("/")
             }
-            className="mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+            className="mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             Go home
           </button>
@@ -354,13 +504,23 @@ const PublicFile = () => {
   }
 
 
+  // ==========================================================
+  // SAFETY CHECK
+  // ==========================================================
+
   if (!file) {
     return null;
   }
 
 
+  // ==========================================================
+  // FILE TYPE
+  // ==========================================================
+
   const Icon =
-    getFileIcon(file.mime_type);
+    getFileIcon(
+      file.mime_type
+    );
 
 
   const isImage =
@@ -368,15 +528,18 @@ const PublicFile = () => {
       "image/"
     );
 
+
   const isVideo =
     file.mime_type?.startsWith(
       "video/"
     );
 
+
   const isAudio =
     file.mime_type?.startsWith(
       "audio/"
     );
+
 
   const isPdf =
     file.mime_type?.includes(
@@ -391,11 +554,15 @@ const PublicFile = () => {
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* HEADER */}
+      {/* ====================================================
+          HEADER
+      ==================================================== */}
 
       <header className="border-b border-slate-200 bg-white">
 
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+
+          {/* FILE INFO */}
 
           <div className="flex min-w-0 items-center gap-3">
 
@@ -404,6 +571,7 @@ const PublicFile = () => {
               <Icon size={20} />
 
             </div>
+
 
             <div className="min-w-0">
 
@@ -423,9 +591,13 @@ const PublicFile = () => {
           </div>
 
 
+          {/* DOWNLOAD */}
+
           <button
-            onClick={handleDownload}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+            onClick={
+              handleDownload
+            }
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
 
             <Download size={17} />
@@ -439,15 +611,20 @@ const PublicFile = () => {
       </header>
 
 
-      {/* CONTENT */}
+      {/* ====================================================
+          CONTENT
+      ==================================================== */}
 
       <main className="mx-auto max-w-6xl px-6 py-8">
 
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
 
-          {/* IMAGE */}
+          {/* =================================================
+              IMAGE
+          ================================================= */}
 
           {isImage && (
+
             <div className="flex min-h-[500px] items-center justify-center bg-slate-100 p-8">
 
               <img
@@ -457,12 +634,16 @@ const PublicFile = () => {
               />
 
             </div>
+
           )}
 
 
-          {/* VIDEO */}
+          {/* =================================================
+              VIDEO
+          ================================================= */}
 
           {isVideo && (
+
             <div className="flex min-h-[500px] items-center justify-center bg-slate-950 p-6">
 
               <video
@@ -472,12 +653,16 @@ const PublicFile = () => {
               />
 
             </div>
+
           )}
 
 
-          {/* AUDIO */}
+          {/* =================================================
+              AUDIO
+          ================================================= */}
 
           {isAudio && (
+
             <div className="flex min-h-[400px] flex-col items-center justify-center gap-6">
 
               <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-slate-100 text-slate-700">
@@ -486,6 +671,7 @@ const PublicFile = () => {
 
               </div>
 
+
               <audio
                 controls
                 className="w-full max-w-lg"
@@ -493,12 +679,16 @@ const PublicFile = () => {
               />
 
             </div>
+
           )}
 
 
-          {/* PDF */}
+          {/* =================================================
+              PDF
+          ================================================= */}
 
           {isPdf && (
+
             <div className="h-[75vh] min-h-[500px]">
 
               <iframe
@@ -508,15 +698,19 @@ const PublicFile = () => {
               />
 
             </div>
+
           )}
 
 
-          {/* OTHER FILE TYPES */}
+          {/* =================================================
+              OTHER FILE TYPES
+          ================================================= */}
 
           {!isImage &&
             !isVideo &&
             !isAudio &&
             !isPdf && (
+
               <div className="flex min-h-[450px] flex-col items-center justify-center p-8 text-center">
 
                 <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-100 text-slate-600">
@@ -525,20 +719,23 @@ const PublicFile = () => {
 
                 </div>
 
+
                 <h2 className="mt-5 text-lg font-semibold text-slate-800">
                   {file.name}
                 </h2>
+
 
                 <p className="mt-2 max-w-md text-sm text-slate-400">
                   This file type cannot be previewed
                   in the browser.
                 </p>
 
+
                 <button
                   onClick={
                     handleDownload
                   }
-                  className="mt-6 flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
+                  className="mt-6 flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
                 >
 
                   <Download size={17} />
@@ -548,6 +745,7 @@ const PublicFile = () => {
                 </button>
 
               </div>
+
             )}
 
         </div>
