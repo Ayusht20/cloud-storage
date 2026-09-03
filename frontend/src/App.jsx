@@ -12,7 +12,7 @@ import PublicFile from "./pages/PublicFile";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import Shared from "./pages/Shared";
-
+import Trash from "./pages/Trash";
 const App = () => {
   return (
     <BrowserRouter>
@@ -28,7 +28,14 @@ const App = () => {
             />
           }
         />
-
+<Route
+  path="/trash"
+  element={
+    <ProtectedRoute>
+      <Trash />
+    </ProtectedRoute>
+  }
+/>
         <Route
           path="/login"
           element={<Login />}
