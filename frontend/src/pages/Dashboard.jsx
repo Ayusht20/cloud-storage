@@ -289,84 +289,87 @@ const Dashboard = () => {
   // ==================================================
   // VIEW FILE
   // ==================================================
-const handleView = async (file) => {
-  setError("");
 
-  setPreviewFile(file);
-  setPreviewUrl("");
-  setPreviewLoading(true);
+  const handleView = async (file) => {
+    setError("");
 
-  try {
-    const blob =
-      await fileService.getFileContent(
-        file.id
+    setPreviewFile(file);
+    setPreviewUrl("");
+    setPreviewLoading(true);
+
+    try {
+      const blob =
+        await fileService.getFileContent(
+          file.id
+        );
+
+      const url =
+        window.URL.createObjectURL(
+          blob
+        );
+
+      setPreviewUrl(url);
+
+    } catch (err) {
+
+      setPreviewFile(null);
+
+      setError(
+        err.message ||
+          "Unable to preview this file"
       );
 
-    const url =
-      window.URL.createObjectURL(
-        blob
-      );
+    } finally {
 
-    setPreviewUrl(url);
+      setPreviewLoading(false);
 
-  } catch (err) {
-
-    setPreviewFile(null);
-
-    setError(
-      err.message ||
-        "Unable to preview this file"
-    );
-
-  } finally {
-
-    setPreviewLoading(false);
-  }
-};
+    }
+  };
 
 
   // ==================================================
   // CLOSE PREVIEW
   // ==================================================
 
-const handleClosePreview = () => {
+  const handleClosePreview = () => {
 
-  if (previewUrl) {
-    window.URL.revokeObjectURL(
-      previewUrl
-    );
-  }
+    if (previewUrl) {
+      window.URL.revokeObjectURL(
+        previewUrl
+      );
+    }
 
-  setPreviewFile(null);
-  setPreviewUrl("");
-  setPreviewLoading(false);
-};
+    setPreviewFile(null);
+    setPreviewUrl("");
+    setPreviewLoading(false);
+  };
 
 
   // ==================================================
   // DOWNLOAD FILE
   // ==================================================
 
-const handleDownload = async (
-  file
-) => {
-  try {
+  const handleDownload = async (
+    file
+  ) => {
 
-    setError("");
+    try {
 
-    await fileService.downloadFile(
-      file
-    );
+      setError("");
 
-  } catch (err) {
+      await fileService.downloadFile(
+        file
+      );
 
-    setError(
-      err.message ||
-        "Failed to download file"
-    );
+    } catch (err) {
 
-  }
-};
+      setError(
+        err.message ||
+          "Failed to download file"
+      );
+
+    }
+  };
 
 
   // ==================================================
@@ -391,6 +394,7 @@ const handleDownload = async (
   const handleRename = async (
     file
   ) => {
+
     const newName =
       window.prompt(
         "Enter new file name",
@@ -406,6 +410,7 @@ const handleDownload = async (
     }
 
     try {
+
       setError("");
 
       await fileService.renameFile(
@@ -414,18 +419,25 @@ const handleDownload = async (
       );
 
       if (currentFolder) {
+
         await loadFolderContents(
           currentFolder,
           breadcrumbs
         );
+
       } else {
+
         await loadRootContents();
+
       }
+
     } catch (err) {
+
       setError(
         err.message ||
           "Failed to rename file"
       );
+
     }
   };
 
@@ -437,6 +449,7 @@ const handleDownload = async (
   const handleDeleteFile = async (
     file
   ) => {
+
     const confirmed =
       window.confirm(
         `Move "${file.name}" to trash?`
@@ -447,6 +460,7 @@ const handleDownload = async (
     }
 
     try {
+
       setError("");
 
       await fileService.deleteFile(
@@ -454,18 +468,74 @@ const handleDownload = async (
       );
 
       if (currentFolder) {
+
         await loadFolderContents(
           currentFolder,
           breadcrumbs
         );
+
       } else {
+
         await loadRootContents();
+
       }
+
     } catch (err) {
+
       setError(
         err.message ||
           "Failed to move file to trash"
       );
+
+    }
+  };
+
+
+  // ==================================================
+  // DELETE FOLDER
+  // ==================================================
+
+  const handleDeleteFolder = async (
+    folder
+  ) => {
+
+    const confirmed =
+      window.confirm(
+        `Move "${folder.name}" to trash?`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+
+      setError("");
+
+      await folderService.deleteFolder(
+        folder.id
+      );
+
+      if (currentFolder) {
+
+        await loadFolderContents(
+          currentFolder,
+          breadcrumbs
+        );
+
+      } else {
+
+        await loadRootContents();
+
+      }
+
+    } catch (err) {
+
+      setError(
+        err.message ||
+          "Failed to move folder to trash"
+      );
+
     }
   };
 
@@ -477,6 +547,7 @@ const handleDownload = async (
   const handleFolderOpen = async (
     folder
   ) => {
+
     const nextBreadcrumbs = [
       ...breadcrumbs,
       {
@@ -501,11 +572,14 @@ const handleDownload = async (
       breadcrumb,
       index
     ) => {
+
       if (
         index === 0 ||
         !breadcrumb.id
       ) {
+
         await loadRootContents();
+
         return;
       }
 
@@ -537,10 +611,13 @@ const handleDownload = async (
   // ==================================================
 
   const handleBack = async () => {
+
     if (
       breadcrumbs.length <= 1
     ) {
+
       await loadRootContents();
+
       return;
     }
 
@@ -556,7 +633,9 @@ const handleDownload = async (
       ];
 
     if (!parent.id) {
+
       await loadRootContents();
+
       return;
     }
 
@@ -577,12 +656,15 @@ const handleDownload = async (
   const loadMoveFolders = async (
     folderId = null
   ) => {
+
     setMoveLoading(true);
 
     try {
+
       let folderList = [];
 
       if (!folderId) {
+
         const data =
           await folderService.getFolders();
 
@@ -590,7 +672,9 @@ const handleDownload = async (
           Array.isArray(data)
             ? data
             : data?.folders || [];
+
       } else {
+
         const data =
           await folderService.getFolderContents(
             folderId
@@ -610,15 +694,20 @@ const handleDownload = async (
       setMoveFolders(
         folderList
       );
+
     } catch (err) {
+
       setError(
         err.message ||
           "Failed to load folders"
       );
 
       setMoveFolders([]);
+
     } finally {
+
       setMoveLoading(false);
+
     }
   };
 
@@ -626,6 +715,7 @@ const handleDownload = async (
   const handleMove = async (
     file
   ) => {
+
     setError("");
 
     setFileToMove(file);
@@ -642,6 +732,7 @@ const handleDownload = async (
 
   const handleMoveFolderOpen =
     async (folder) => {
+
       const nextPath = [
         ...movePath,
         {
@@ -665,6 +756,7 @@ const handleDownload = async (
       breadcrumb,
       index
     ) => {
+
       const nextPath =
         movePath.slice(
           0,
@@ -683,6 +775,7 @@ const handleDownload = async (
 
   const handleMoveBack =
     async () => {
+
       if (
         movePath.length <= 1
       ) {
@@ -711,6 +804,7 @@ const handleDownload = async (
 
 
   const closeMoveModal = () => {
+
     if (moving) {
       return;
     }
@@ -729,6 +823,7 @@ const handleDownload = async (
 
   const handleConfirmMove =
     async () => {
+
       if (!fileToMove) {
         return;
       }
@@ -742,6 +837,7 @@ const handleDownload = async (
         destination.id ===
         (currentFolder?.id || null)
       ) {
+
         setError(
           "The file is already in this folder"
         );
@@ -753,6 +849,7 @@ const handleDownload = async (
       setError("");
 
       try {
+
         await fileService.moveFile(
           fileToMove.id,
           destination.id || null
@@ -761,20 +858,29 @@ const handleDownload = async (
         closeMoveModal();
 
         if (currentFolder) {
+
           await loadFolderContents(
             currentFolder,
             breadcrumbs
           );
+
         } else {
+
           await loadRootContents();
+
         }
+
       } catch (err) {
+
         setError(
           err.message ||
             "Failed to move file"
         );
+
       } finally {
+
         setMoving(false);
+
       }
     };
 
@@ -820,6 +926,7 @@ const handleDownload = async (
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
 
           <div>
+
             <h1 className="text-2xl font-bold text-slate-900">
               My Files
             </h1>
@@ -827,6 +934,7 @@ const handleDownload = async (
             <p className="mt-1 text-sm text-slate-500">
               Manage your files and folders
             </p>
+
           </div>
 
 
@@ -850,11 +958,13 @@ const handleDownload = async (
               disabled={uploading}
               className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60"
             >
+
               <Upload size={18} />
 
               {uploading
                 ? "Uploading..."
                 : "Upload"}
+
             </button>
 
 
@@ -899,6 +1009,7 @@ const handleDownload = async (
               breadcrumb,
               index
             ) => (
+
               <div
                 key={
                   breadcrumb.id ||
@@ -913,6 +1024,7 @@ const handleDownload = async (
                     className="text-slate-300"
                   />
                 )}
+
 
                 <button
                   onClick={() =>
@@ -938,6 +1050,7 @@ const handleDownload = async (
                 </button>
 
               </div>
+
             )
           )}
 
@@ -947,6 +1060,7 @@ const handleDownload = async (
         {/* BACK */}
 
         {currentFolder && (
+
           <button
             onClick={
               handleBack
@@ -954,15 +1068,20 @@ const handleDownload = async (
             disabled={loading}
             className="mb-6 flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-50"
           >
+
             <ArrowLeft size={17} />
+
             Back
+
           </button>
+
         )}
 
 
         {/* ERROR */}
 
         {error && (
+
           <div className="mb-6 flex items-center justify-between rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
 
             <span>
@@ -978,12 +1097,14 @@ const handleDownload = async (
             </button>
 
           </div>
+
         )}
 
 
         {/* CONTENT */}
 
         {loading ? (
+
           <div className="flex min-h-64 items-center justify-center">
 
             <div className="text-center">
@@ -997,7 +1118,9 @@ const handleDownload = async (
             </div>
 
           </div>
+
         ) : (
+
           <>
 
             {/* FOLDERS */}
@@ -1019,6 +1142,7 @@ const handleDownload = async (
 
                 </div>
 
+
                 <span className="text-xs text-slate-400">
                   {
                     filteredFolders.length
@@ -1030,26 +1154,29 @@ const handleDownload = async (
 
               {filteredFolders.length >
               0 ? (
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
                   {filteredFolders.map(
                     (folder) => (
-                      <FolderCard
-                        key={
-                          folder.id
-                        }
-                        folder={
-                          folder
-                        }
-                        onOpen={
-                          handleFolderOpen
-                        }
-                      />
+
+<FolderCard
+  key={folder.id}
+  folder={folder}
+  onOpen={handleFolderOpen}
+  onRename={handleRenameFolder}
+  onShare={handleShareFolder}
+  onMove={handleMoveFolder}
+  onDelete={handleDeleteFolder}
+/>
+
                     )
                   )}
 
                 </div>
+
               ) : (
+
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
 
                   <Folder
@@ -1062,6 +1189,7 @@ const handleDownload = async (
                   </p>
 
                 </div>
+
               )}
 
             </section>
@@ -1086,6 +1214,7 @@ const handleDownload = async (
 
                 </div>
 
+
                 <span className="text-xs text-slate-400">
                   {
                     filteredFiles.length
@@ -1097,10 +1226,12 @@ const handleDownload = async (
 
               {filteredFiles.length >
               0 ? (
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
                   {filteredFiles.map(
                     (file) => (
+
                       <FileCard
                         key={
                           file.id
@@ -1127,11 +1258,14 @@ const handleDownload = async (
                           handleDeleteFile
                         }
                       />
+
                     )
                   )}
 
                 </div>
+
               ) : (
+
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
 
                   <Files
@@ -1144,11 +1278,13 @@ const handleDownload = async (
                   </p>
 
                 </div>
+
               )}
 
             </section>
 
           </>
+
         )}
 
       </div>
@@ -1159,6 +1295,7 @@ const handleDownload = async (
           ================================================== */}
 
       {previewFile && (
+
         <FilePreviewModal
           file={previewFile}
           previewUrl={previewUrl}
@@ -1170,6 +1307,7 @@ const handleDownload = async (
             handleDownload
           }
         />
+
       )}
 
 
@@ -1178,10 +1316,12 @@ const handleDownload = async (
           ================================================== */}
 
       {shareFile && (
+
         <ShareModal
           file={shareFile}
           onClose={handleCloseShare}
         />
+
       )}
 
 
@@ -1190,6 +1330,7 @@ const handleDownload = async (
           ================================================== */}
 
       {moveModalOpen && (
+
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
 
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
@@ -1240,6 +1381,7 @@ const handleDownload = async (
                     breadcrumb,
                     index
                   ) => (
+
                     <div
                       key={
                         breadcrumb.id ||
@@ -1249,11 +1391,14 @@ const handleDownload = async (
                     >
 
                       {index > 0 && (
+
                         <ChevronRight
                           size={15}
                           className="mx-1 text-slate-300"
                         />
+
                       )}
+
 
                       <button
                         onClick={() =>
@@ -1274,6 +1419,7 @@ const handleDownload = async (
                       </button>
 
                     </div>
+
                   )
                 )}
 
@@ -1287,17 +1433,21 @@ const handleDownload = async (
             <div className="max-h-80 overflow-y-auto p-3">
 
               {moveLoading ? (
+
                 <div className="flex min-h-48 items-center justify-center">
 
                   <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
 
                 </div>
+
               ) : moveFolders.length >
                 0 ? (
+
                 <div className="space-y-1">
 
                   {moveFolders.map(
                     (folder) => (
+
                       <button
                         key={
                           folder.id
@@ -1334,17 +1484,21 @@ const handleDownload = async (
 
                         </div>
 
+
                         <ChevronRight
                           size={17}
                           className="text-slate-300"
                         />
 
                       </button>
+
                     )
                   )}
 
                 </div>
+
               ) : (
+
                 <div className="flex min-h-48 flex-col items-center justify-center text-center">
 
                   <FolderOpen
@@ -1361,6 +1515,7 @@ const handleDownload = async (
                   </p>
 
                 </div>
+
               )}
 
             </div>
@@ -1412,16 +1567,21 @@ const handleDownload = async (
                 >
 
                   {moving ? (
+
                     <>
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-white" />
 
                       Moving...
                     </>
+
                   ) : (
+
                     <>
                       <Check size={16} />
+
                       Move here
                     </>
+
                   )}
 
                 </button>
@@ -1433,6 +1593,7 @@ const handleDownload = async (
           </div>
 
         </div>
+
       )}
 
     </Layout>
