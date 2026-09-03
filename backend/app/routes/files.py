@@ -1,4 +1,5 @@
 import urllib.request
+from datetime import datetime, timezone
 
 from fastapi import (
     APIRouter,
@@ -114,7 +115,6 @@ async def upload_user_file(
     # --------------------------------------------------------
 
     file_content = await uploaded_file.read()
-
     file_size = len(file_content)
 
     if file_size == 0:
@@ -701,7 +701,12 @@ def delete_file(
             detail="You do not have permission to delete this file",
         )
 
+    # --------------------------------------------------------
+    # Soft delete
+    # --------------------------------------------------------
+
     file_record.is_deleted = True
+    file_record.deleted_at = datetime.now(timezone.utc)
 
     db.commit()
 
