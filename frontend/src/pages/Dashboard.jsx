@@ -16,6 +16,8 @@ import {
   Check,
   FolderOpen,
   Download,
+  Bell,
+  CheckCheck,
 } from "lucide-react";
 
 import Layout from "../components/Layout";
@@ -26,6 +28,7 @@ import ShareModal from "../components/ShareModal";
 
 import fileService from "../services/fileService";
 import folderService from "../services/folderService";
+import notificationService from "../services/notificationService";
 import { useAuth } from "../context/AuthContext";
 
 
@@ -57,6 +60,19 @@ const Dashboard = () => {
 
   const [error, setError] =
     useState("");
+
+  // ==================================================
+  // NOTIFICATIONS
+  // ==================================================
+
+  const [notifications, setNotifications] =
+    useState([]);
+
+  const [notificationOpen, setNotificationOpen] =
+    useState(false);
+
+  const [notificationLoading, setNotificationLoading] =
+    useState(false);
 
   const fileInputRef = useRef(null);
 
@@ -192,6 +208,121 @@ const Dashboard = () => {
   useEffect(() => {
     loadRootContents();
   }, []);
+
+
+  // ==================================================
+  // NOTIFICATIONS
+  // ==================================================
+
+  const loadNotifications = async () => {
+    try {
+      setNotificationLoading(true);
+
+      const data =
+        await notificationService.getNotifications();
+
+      setNotifications(
+        Array.isArray(data) ? data : []
+      );
+    } catch (err) {
+      console.error(
+        "Failed to load notifications",
+        err
+      );
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+    loadNotifications();
+
+    const interval =
+      window.setInterval(
+        loadNotifications,
+        30000
+      );
+
+    return () =>
+      window.clearInterval(interval);
+  }, []);
+
+
+  const unreadNotifications =
+    notifications.filter(
+      (notification) => !notification.is_read
+    );
+
+
+  const handleNotificationClick = async (
+    notification
+  ) => {
+    if (notification.is_read) {
+      return;
+    }
+
+    try {
+      const updated =
+        await notificationService.markAsRead(
+          notification.id
+        );
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item.id === notification.id
+            ? updated
+            : item
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Failed to mark notification as read",
+        err
+      );
+    }
+  };
+
+
+  const handleMarkAllNotificationsRead =
+    async () => {
+      if (!unreadNotifications.length) {
+        return;
+      }
+
+      try {
+        await notificationService.markAllAsRead();
+
+        setNotifications((current) =>
+          current.map((notification) => ({
+            ...notification,
+            is_read: true,
+          }))
+        );
+      } catch (err) {
+        console.error(
+          "Failed to mark all notifications as read",
+          err
+        );
+      }
+    };
+
+
+  const formatNotificationTime = (
+    createdAt
+  ) => {
+    if (!createdAt) {
+      return "";
+    }
+
+    const date = new Date(createdAt);
+
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    return date.toLocaleString();
+  };
 
 
   // ==================================================
@@ -966,6 +1097,133 @@ const Dashboard = () => {
                 : "Upload"}
 
             </button>
+
+
+            {/* NOTIFICATIONS */}
+
+            <div className="relative">
+
+              <button
+                type="button"
+                onClick={() =>
+                  setNotificationOpen(
+                    (open) => !open
+                  )
+                }
+                className="relative flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
+                title="Notifications"
+              >
+                <Bell size={19} />
+
+                {unreadNotifications.length > 0 && (
+                  <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {unreadNotifications.length > 99
+                      ? "99+"
+                      : unreadNotifications.length}
+                  </span>
+                )}
+              </button>
+
+
+              {notificationOpen && (
+                <div className="absolute right-0 top-14 z-50 w-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+
+                  <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">
+                        Notifications
+                      </h3>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {unreadNotifications.length}
+                        {" "}
+                        unread
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={
+                        handleMarkAllNotificationsRead
+                      }
+                      disabled={
+                        unreadNotifications.length === 0
+                      }
+                      className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <CheckCheck size={14} />
+                      Mark all read
+                    </button>
+                  </div>
+
+
+                  <div className="max-h-[360px] overflow-y-auto">
+
+                    {notificationLoading ? (
+                      <div className="flex min-h-32 items-center justify-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
+                      </div>
+                    ) : notifications.length > 0 ? (
+                      notifications.map((notification) => (
+                        <button
+                          type="button"
+                          key={notification.id}
+                          onClick={() =>
+                            handleNotificationClick(
+                              notification
+                            )
+                          }
+                          className={`w-full border-b border-slate-100 px-4 py-3 text-left transition last:border-b-0 hover:bg-slate-50 ${
+                            notification.is_read
+                              ? "bg-white"
+                              : "bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex gap-3">
+                            <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
+                              notification.is_read
+                                ? "bg-slate-200"
+                                : "bg-slate-900"
+                            }`} />
+
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-slate-800">
+                                {notification.title}
+                              </p>
+
+                              <p className="mt-1 text-xs leading-5 text-slate-500">
+                                {notification.message}
+                              </p>
+
+                              <p className="mt-1.5 text-[10px] text-slate-400">
+                                {formatNotificationTime(
+                                  notification.created_at
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="flex min-h-32 flex-col items-center justify-center px-6 text-center">
+                        <Bell
+                          size={28}
+                          className="mb-2 text-slate-300"
+                        />
+                        <p className="text-sm font-medium text-slate-600">
+                          No notifications
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          You're all caught up.
+                        </p>
+                      </div>
+                    )}
+
+                  </div>
+
+                </div>
+              )}
+
+            </div>
 
 
             <button
