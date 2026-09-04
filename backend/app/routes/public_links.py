@@ -107,7 +107,6 @@ def verify_public_link_password(
     public_link: PublicLink,
     password: str | None,
 ):
-
     if not public_link.password_hash:
         return
 
@@ -241,6 +240,11 @@ def create_public_link(
         token=token,
         file_id=file_id,
         folder_id=folder_id,
+
+        # Public links default to viewer
+        # unless editor was explicitly selected.
+        permission=link_data.permission.value,
+
         password_hash=(
             hash_password(
                 link_data.password
@@ -248,6 +252,7 @@ def create_public_link(
             if link_data.password
             else None
         ),
+
         expires_at=expires_at,
         is_active=True,
     )
@@ -263,19 +268,27 @@ def create_public_link(
 
     return PublicLinkResponse(
         id=str(public_link.id),
+
         token=public_link.token,
+
         file_id=(
             str(public_link.file_id)
             if public_link.file_id
             else None
         ),
+
         folder_id=(
             str(public_link.folder_id)
             if public_link.folder_id
             else None
         ),
+
+        permission=public_link.permission,
+
         expires_at=public_link.expires_at,
+
         is_active=public_link.is_active,
+
         created_at=public_link.created_at,
     )
 
@@ -324,21 +337,30 @@ def list_public_links(
     return [
         PublicLinkResponse(
             id=str(link.id),
+
             token=link.token,
+
             file_id=(
                 str(link.file_id)
                 if link.file_id
                 else None
             ),
+
             folder_id=(
                 str(link.folder_id)
                 if link.folder_id
                 else None
             ),
+
+            permission=link.permission,
+
             expires_at=link.expires_at,
+
             is_active=link.is_active,
+
             created_at=link.created_at,
         )
+
         for link in links
     ]
 
@@ -455,10 +477,16 @@ def access_public_link(
 
         return PublicFileResponse(
             id=str(file.id),
+
             name=file.name,
+
             mime_type=file.mime_type,
+
             size=file.size,
+
             download_url=download_url,
+
+            permission=public_link.permission,
         )
 
     # --------------------------------------------------------
@@ -482,8 +510,12 @@ def access_public_link(
 
         return {
             "type": "folder",
+
             "id": str(folder.id),
+
             "name": folder.name,
+
+            "permission": public_link.permission,
         }
 
     raise HTTPException(
@@ -593,33 +625,50 @@ def get_public_folder_contents(
     return {
         "folder": {
             "id": str(folder.id),
+
             "name": folder.name,
+
+            "permission": public_link.permission,
         },
+
+        "permission": public_link.permission,
 
         "folders": [
             {
                 "id": str(child.id),
+
                 "name": child.name,
+
                 "parent_id": (
                     str(child.parent_id)
                     if child.parent_id
                     else None
                 ),
+
+                "permission": public_link.permission,
             }
+
             for child in folders
         ],
 
         "files": [
             {
                 "id": str(file.id),
+
                 "name": file.name,
+
                 "mime_type": file.mime_type,
+
                 "size": file.size,
+
                 "download_url": get_download_url(
                     public_id=file.storage_public_id,
                     resource_type=file.resource_type,
                 ),
+
+                "permission": public_link.permission,
             }
+
             for file in files
         ],
     }

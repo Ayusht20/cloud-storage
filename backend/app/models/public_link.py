@@ -40,6 +40,16 @@ class PublicLink(Base):
         index=True,
     )
 
+    # ==================================================
+    # PUBLIC LINK PERMISSION
+    # ==================================================
+
+    permission: Mapped[str] = mapped_column(
+        String(20),
+        default="viewer",
+        nullable=False,
+    )
+
     password_hash: Mapped[str | None] = mapped_column(
         String,
         nullable=True,
