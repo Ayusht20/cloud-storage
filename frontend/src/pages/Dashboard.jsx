@@ -661,7 +661,51 @@ const handleNotificationClick = async (
 
     }
   };
+// ==================================================
+// RENAME FOLDER
+// ==================================================
 
+const handleRenameFolder = async (
+  folder
+) => {
+  const newName =
+    window.prompt(
+      "Enter new folder name",
+      folder.name
+    );
+
+  if (
+    !newName ||
+    !newName.trim() ||
+    newName.trim() === folder.name
+  ) {
+    return;
+  }
+
+  try {
+    setError("");
+
+    await folderService.updateFolder(
+      folder.id,
+      newName.trim()
+    );
+
+    if (currentFolder) {
+      await loadFolderContents(
+        currentFolder,
+        breadcrumbs
+      );
+    } else {
+      await loadRootContents();
+    }
+
+  } catch (err) {
+    setError(
+      err.message ||
+        "Failed to rename folder"
+    );
+  }
+};
 
   // ==================================================
   // DELETE FILE
@@ -874,9 +918,10 @@ const handleNotificationClick = async (
   // MOVE
   // ==================================================
 
-  const loadMoveFolders = async (
-    folderId = null
-  ) => {
+const loadMoveFolders = async (
+  folderId = null,
+  movingItem = fileToMove
+) =>  {
 
     setMoveLoading(true);
 
@@ -904,13 +949,34 @@ const handleNotificationClick = async (
         folderList =
           data?.folders || [];
       }
+folderList =
+  folderList.filter(
+    (folder) => {
 
-      folderList =
-        folderList.filter(
-          (folder) =>
-            folder.id !==
-            currentFolder?.id
-        );
+      // Never show the current folder
+if (
+  movingItem?._moveType ===
+    "folder" &&
+  folder.id ===
+    movingItem?.id
+) {
+  return false;
+}
+
+      // Never allow a folder to be
+      // moved into itself
+      if (
+        fileToMove?._moveType ===
+          "folder" &&
+        folder.id ===
+          fileToMove?.id
+      ) {
+        return false;
+      }
+
+      return true;
+    }
+  );
 
       setMoveFolders(
         folderList
@@ -933,23 +999,30 @@ const handleNotificationClick = async (
   };
 
 
-  const handleMove = async (
-    file
-  ) => {
+const handleMove = async (
+  item,
+  itemType = "file"
+) => {
+  setError("");
 
-    setError("");
-
-    setFileToMove(file);
-
-    setMovePath([
-      ROOT_FOLDER,
-    ]);
-
-    setMoveModalOpen(true);
-
-    await loadMoveFolders(null);
+  const moveItem = {
+    ...item,
+    _moveType: itemType,
   };
 
+  setFileToMove(moveItem);
+
+  setMovePath([
+    ROOT_FOLDER,
+  ]);
+
+  setMoveModalOpen(true);
+
+  await loadMoveFolders(
+    null,
+    moveItem
+  );
+};
 
   const handleMoveFolderOpen =
     async (folder) => {
@@ -1042,68 +1115,90 @@ const handleNotificationClick = async (
   };
 
 
-  const handleConfirmMove =
-    async () => {
+const handleConfirmMove =
+  async () => {
 
-      if (!fileToMove) {
-        return;
-      }
+    if (!fileToMove) {
+      return;
+    }
 
-      const destination =
-        movePath[
-          movePath.length - 1
-        ];
+    const destination =
+      movePath[
+        movePath.length - 1
+      ];
 
-      if (
-        destination.id ===
-        (currentFolder?.id || null)
-      ) {
+    const itemType =
+      fileToMove._moveType ||
+      "file";
 
-        setError(
-          "The file is already in this folder"
+    if (
+      destination.id ===
+      (currentFolder?.id || null)
+    ) {
+      setError(
+        `The ${
+          itemType === "folder"
+            ? "folder"
+            : "file"
+        } is already in this folder`
+      );
+
+      return;
+    }
+
+    setMoving(true);
+    setError("");
+
+    try {
+
+      if (itemType === "folder") {
+
+        await folderService.moveFolder(
+          fileToMove.id,
+          destination.id || null
         );
 
-        return;
-      }
-
-      setMoving(true);
-      setError("");
-
-      try {
+      } else {
 
         await fileService.moveFile(
           fileToMove.id,
           destination.id || null
         );
 
-        closeMoveModal();
+      }
 
-        if (currentFolder) {
+      closeMoveModal();
 
-          await loadFolderContents(
-            currentFolder,
-            breadcrumbs
-          );
+      if (currentFolder) {
 
-        } else {
-
-          await loadRootContents();
-
-        }
-
-      } catch (err) {
-
-        setError(
-          err.message ||
-            "Failed to move file"
+        await loadFolderContents(
+          currentFolder,
+          breadcrumbs
         );
 
-      } finally {
+      } else {
 
-        setMoving(false);
+        await loadRootContents();
 
       }
-    };
+
+    } catch (err) {
+
+      setError(
+        err.message ||
+          `Failed to move ${
+            itemType === "folder"
+              ? "folder"
+              : "file"
+          }`
+      );
+
+    } finally {
+
+      setMoving(false);
+
+    }
+  };
 
 
   // ==================================================
@@ -1512,16 +1607,33 @@ const handleNotificationClick = async (
   key={folder.id}
   className="relative z-20"
 >
-  <FolderCard
-    folder={folder}
-    permission={getPermission(folder)}
-    onOpen={handleFolderOpen}
-    onDelete={
-      canEditItem(folder)
-        ? handleDeleteFolder
-        : undefined
-    }
-  />
+<FolderCard
+  folder={folder}
+  permission={getPermission(folder)}
+  onOpen={handleFolderOpen}
+
+  onRename={
+    canEditItem(folder)
+      ? handleRenameFolder
+      : undefined
+  }
+
+  onMove={
+    canEditItem(folder)
+      ? (item) =>
+          handleMove(
+            item,
+            "folder"
+          )
+      : undefined
+  }
+
+  onDelete={
+    canEditItem(folder)
+      ? handleDeleteFolder
+      : undefined
+  }
+/>
 </div>
 
                     )
@@ -1601,10 +1713,14 @@ const handleNotificationClick = async (
                               : undefined
                           }
                           onMove={
-                            canEditItem(file)
-                              ? handleMove
-                              : undefined
-                          }
+  canEditItem(file)
+    ? (item) =>
+        handleMove(
+          item,
+          "file"
+        )
+    : undefined
+}
                           onShare={
                             canShareItem(file)
                               ? handleShare
@@ -1697,10 +1813,12 @@ const handleNotificationClick = async (
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
 
               <div className="min-w-0">
-
-                <h2 className="font-semibold text-slate-900">
-                  Move file
-                </h2>
+<h2 className="font-semibold text-slate-900">
+  Move{" "}
+  {fileToMove?._moveType === "folder"
+    ? "folder"
+    : "file"}
+</h2>
 
                 <p
                   className="mt-1 truncate text-xs text-slate-400"
@@ -1869,9 +1987,13 @@ const handleNotificationClick = async (
                     No subfolders
                   </p>
 
-                  <p className="mt-1 text-xs text-slate-400">
-                    You can move the file here.
-                  </p>
+<p className="mt-1 text-xs text-slate-400">
+  You can move the{" "}
+  {fileToMove?._moveType === "folder"
+    ? "folder"
+    : "file"}{" "}
+  here.
+</p>
 
                 </div>
 
