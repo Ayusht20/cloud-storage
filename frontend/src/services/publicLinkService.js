@@ -49,6 +49,25 @@ const publicLinkService = {
 
 
   // ==========================================================
+  // UPDATE PUBLIC LINK PERMISSION
+  // ==========================================================
+
+  updatePermission(
+    linkId,
+    permission
+  ) {
+    return api.patch(
+      `/public-links/${encodeURIComponent(
+        linkId
+      )}/permission`,
+      {
+        permission,
+      }
+    );
+  },
+
+
+  // ==========================================================
   // REVOKE LINK
   // ==========================================================
 

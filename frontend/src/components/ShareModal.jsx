@@ -12,6 +12,8 @@ import {
   Globe,
   Lock,
   Calendar,
+  Eye,
+  Pencil,
 } from "lucide-react";
 
 import {
@@ -72,6 +74,9 @@ const ShareModal = ({
   const [expiry, setExpiry] =
     useState("");
 
+  const [publicPermission, setPublicPermission] =
+    useState("viewer");
+
 
   // ==========================================================
   // LOAD SHARES + PUBLIC LINK
@@ -98,11 +103,13 @@ const ShareModal = ({
         publicLinkService.getPublicLinks(),
       ]);
 
+
       setShares(
         Array.isArray(shareData)
           ? shareData
           : []
       );
+
 
       const existing =
         Array.isArray(links)
@@ -113,9 +120,21 @@ const ShareModal = ({
             )
           : null;
 
+
       setPublicLink(
         existing || null
       );
+
+
+      if (existing?.permission) {
+        setPublicPermission(
+          existing.permission
+        );
+      } else {
+        setPublicPermission(
+          "viewer"
+        );
+      }
 
     } catch (err) {
 
@@ -150,16 +169,21 @@ const ShareModal = ({
     const trimmedEmail =
       email.trim();
 
+
     if (!trimmedEmail) {
+
       setError(
         "Please enter an email address"
       );
+
       return;
     }
+
 
     setSharing(true);
     setError("");
     setSuccess("");
+
 
     try {
 
@@ -169,11 +193,13 @@ const ShareModal = ({
         role
       );
 
+
       setEmail("");
 
       setSuccess(
         `${file.name} was shared with ${trimmedEmail}`
       );
+
 
       await loadData();
 
@@ -204,11 +230,13 @@ const ShareModal = ({
       share.id
     );
 
+
     try {
 
       await shareService.deleteShare(
         share.id
       );
+
 
       setShares(
         (current) =>
@@ -217,6 +245,7 @@ const ShareModal = ({
               item.id !== share.id
           )
       );
+
 
       setSuccess(
         "Access removed successfully"
@@ -238,7 +267,7 @@ const ShareModal = ({
 
 
   // ==========================================================
-  // UPDATE ROLE
+  // UPDATE PEOPLE ROLE
   // ==========================================================
 
   const handleRoleChange = async (
@@ -254,6 +283,7 @@ const ShareModal = ({
           newRole
         );
 
+
       setShares(
         (current) =>
           current.map(
@@ -263,6 +293,7 @@ const ShareModal = ({
                 : item
           )
       );
+
 
       setSuccess(
         "Permission updated successfully"
@@ -290,6 +321,7 @@ const ShareModal = ({
       setError("");
       setSuccess("");
 
+
       try {
 
         const data =
@@ -301,12 +333,25 @@ const ShareModal = ({
 
               expires_at:
                 expiry
-                  ? new Date(expiry).toISOString()
+                  ? new Date(
+                      expiry
+                    ).toISOString()
                   : null,
+
+              permission:
+                publicPermission,
             }
           );
 
+
         setPublicLink(data);
+
+
+        setPublicPermission(
+          data?.permission ||
+            publicPermission
+        );
+
 
         setSuccess(
           "Public link created successfully"
@@ -328,6 +373,91 @@ const ShareModal = ({
 
 
   // ==========================================================
+  // UPDATE PUBLIC LINK PERMISSION
+  // ==========================================================
+
+  const handlePublicPermissionChange =
+    async (event) => {
+
+      const newPermission =
+        event.target.value;
+
+
+      if (!publicLink) {
+        return;
+      }
+
+
+      const previousPermission =
+        publicLink.permission ||
+        "viewer";
+
+
+      setPublicPermission(
+        newPermission
+      );
+
+      setLinkLoading(true);
+      setError("");
+      setSuccess("");
+
+
+      try {
+
+        const updated =
+          await publicLinkService.updatePermission(
+            publicLink.id,
+            newPermission
+          );
+
+
+        const updatedLink = {
+          ...publicLink,
+          ...updated,
+          permission:
+            updated?.permission ||
+            newPermission,
+        };
+
+
+        setPublicLink(
+          updatedLink
+        );
+
+
+        setPublicPermission(
+          updatedLink.permission
+        );
+
+
+        setSuccess(
+          `Public link permission changed to ${
+            updatedLink.permission === "editor"
+              ? "Editor"
+              : "Viewer"
+          }`
+        );
+
+      } catch (err) {
+
+        setPublicPermission(
+          previousPermission
+        );
+
+        setError(
+          err.message ||
+            "Unable to update public link permission"
+        );
+
+      } finally {
+
+        setLinkLoading(false);
+
+      }
+    };
+
+
+  // ==========================================================
   // COPY LINK
   // ==========================================================
 
@@ -337,14 +467,18 @@ const ShareModal = ({
       return;
     }
 
+
     const url =
       `${window.location.origin}/public/${publicLink.token}`;
+
 
     await navigator.clipboard.writeText(
       url
     );
 
+
     setCopied(true);
+
 
     setTimeout(() => {
       setCopied(false);
@@ -362,7 +496,11 @@ const ShareModal = ({
       return;
     }
 
+
     setLinkLoading(true);
+    setError("");
+    setSuccess("");
+
 
     try {
 
@@ -370,10 +508,16 @@ const ShareModal = ({
         publicLink.id
       );
 
+
       setPublicLink(null);
+
+      setPublicPermission(
+        "viewer"
+      );
 
       setPassword("");
       setExpiry("");
+
 
       setSuccess(
         "Public link revoked"
@@ -403,12 +547,14 @@ const ShareModal = ({
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
       onMouseDown={(event) => {
+
         if (
           event.target ===
           event.currentTarget
         ) {
           onClose();
         }
+
       }}
     >
 
@@ -438,7 +584,9 @@ const ShareModal = ({
 
           </div>
 
+
           <button
+            type="button"
             onClick={onClose}
             className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
@@ -450,7 +598,9 @@ const ShareModal = ({
 
         <div className="max-h-[75vh] space-y-6 overflow-y-auto p-6">
 
-          {/* ADD PEOPLE */}
+          {/* ==================================================
+              ADD PEOPLE
+          ================================================== */}
 
           <form
             onSubmit={handleShare}
@@ -474,7 +624,9 @@ const ShareModal = ({
                   type="email"
                   value={email}
                   onChange={(e) =>
-                    setEmail(e.target.value)
+                    setEmail(
+                      e.target.value
+                    )
                   }
                   placeholder="Enter email address"
                   className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
@@ -496,7 +648,9 @@ const ShareModal = ({
                 <select
                   value={role}
                   onChange={(e) =>
-                    setRole(e.target.value)
+                    setRole(
+                      e.target.value
+                    )
                   }
                   className="w-full appearance-none rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none"
                 >
@@ -522,26 +676,25 @@ const ShareModal = ({
 
 
             <button
+              type="submit"
               disabled={sharing}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
             >
 
-              {sharing
-                ? (
-                  <>
-                    <Loader2
-                      size={17}
-                      className="animate-spin"
-                    />
-                    Sharing...
-                  </>
-                )
-                : (
-                  <>
-                    <Share2 size={17} />
-                    Share
-                  </>
-                )}
+              {sharing ? (
+                <>
+                  <Loader2
+                    size={17}
+                    className="animate-spin"
+                  />
+                  Sharing...
+                </>
+              ) : (
+                <>
+                  <Share2 size={17} />
+                  Share
+                </>
+              )}
 
             </button>
 
@@ -555,6 +708,7 @@ const ShareModal = ({
               {error}
             </div>
           )}
+
 
           {success && (
             <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-700">
@@ -572,7 +726,9 @@ const ShareModal = ({
           )}
 
 
-          {/* PEOPLE ACCESS */}
+          {/* ==================================================
+              PEOPLE ACCESS
+          ================================================== */}
 
           <div>
 
@@ -600,9 +756,11 @@ const ShareModal = ({
             {loading ? (
 
               <div className="flex justify-center py-8">
+
                 <Loader2
                   className="animate-spin text-slate-400"
                 />
+
               </div>
 
             ) : shares.length === 0 ? (
@@ -632,10 +790,13 @@ const ShareModal = ({
                   >
 
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white font-semibold text-slate-600">
+
                       {share.email
                         .charAt(0)
                         .toUpperCase()}
+
                     </div>
+
 
                     <div className="min-w-0 flex-1">
 
@@ -644,6 +805,7 @@ const ShareModal = ({
                       </p>
 
                     </div>
+
 
                     <select
                       value={share.role}
@@ -666,26 +828,36 @@ const ShareModal = ({
 
                     </select>
 
+
                     <button
+                      type="button"
                       disabled={
-                        removingId === share.id
+                        removingId ===
+                        share.id
                       }
                       onClick={() =>
-                        handleRemove(share)
+                        handleRemove(
+                          share
+                        )
                       }
                       className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500"
                     >
 
-                      {removingId === share.id
-                        ? (
-                          <Loader2
-                            size={16}
-                            className="animate-spin"
-                          />
-                        )
-                        : (
-                          <Trash2 size={16} />
-                        )}
+                      {removingId ===
+                      share.id ? (
+
+                        <Loader2
+                          size={16}
+                          className="animate-spin"
+                        />
+
+                      ) : (
+
+                        <Trash2
+                          size={16}
+                        />
+
+                      )}
 
                     </button>
 
@@ -700,7 +872,9 @@ const ShareModal = ({
           </div>
 
 
-          {/* PUBLIC LINK */}
+          {/* ==================================================
+              PUBLIC LINK
+          ================================================== */}
 
           <div className="border-t border-slate-200 pt-6">
 
@@ -729,6 +903,8 @@ const ShareModal = ({
 
               <div className="space-y-4">
 
+                {/* PASSWORD */}
+
                 <div>
 
                   <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -743,7 +919,9 @@ const ShareModal = ({
                     type="password"
                     value={password}
                     onChange={(e) =>
-                      setPassword(e.target.value)
+                      setPassword(
+                        e.target.value
+                      )
                     }
                     placeholder="Protect with password"
                     className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-slate-400"
@@ -751,6 +929,8 @@ const ShareModal = ({
 
                 </div>
 
+
+                {/* EXPIRY */}
 
                 <div>
 
@@ -766,7 +946,9 @@ const ShareModal = ({
                     type="datetime-local"
                     value={expiry}
                     onChange={(e) =>
-                      setExpiry(e.target.value)
+                      setExpiry(
+                        e.target.value
+                      )
                     }
                     className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-slate-400"
                   />
@@ -774,28 +956,75 @@ const ShareModal = ({
                 </div>
 
 
+                {/* PUBLIC PERMISSION */}
+
+                <div>
+
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Link permission
+                  </label>
+
+                  <div className="relative">
+
+                    <select
+                      value={publicPermission}
+                      onChange={(e) =>
+                        setPublicPermission(
+                          e.target.value
+                        )
+                      }
+                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-3 pr-10 text-sm outline-none focus:border-slate-400"
+                    >
+
+                      <option value="viewer">
+                        Viewer — View only
+                      </option>
+
+                      <option value="editor">
+                        Editor — Can edit
+                      </option>
+
+                    </select>
+
+                    <ChevronDown
+                      size={17}
+                      className="pointer-events-none absolute right-3 top-3.5 text-slate-400"
+                    />
+
+                  </div>
+
+                </div>
+
+
                 <button
+                  type="button"
                   onClick={handleCreateLink}
                   disabled={linkLoading}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-900 bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
 
-                  {linkLoading
-                    ? (
-                      <>
-                        <Loader2
-                          size={17}
-                          className="animate-spin"
-                        />
-                        Creating...
-                      </>
-                    )
-                    : (
-                      <>
-                        <Link size={17} />
-                        Create public link
-                      </>
-                    )}
+                  {linkLoading ? (
+
+                    <>
+                      <Loader2
+                        size={17}
+                        className="animate-spin"
+                      />
+
+                      Creating...
+
+                    </>
+
+                  ) : (
+
+                    <>
+                      <Link size={17} />
+
+                      Create public link
+
+                    </>
+
+                  )}
 
                 </button>
 
@@ -805,15 +1034,20 @@ const ShareModal = ({
 
               <div className="space-y-3">
 
+                {/* ACTIVE LINK */}
+
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
 
                   <div className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
 
-                    <CheckCircle2 size={17} />
+                    <CheckCircle2
+                      size={17}
+                    />
 
                     Public link active
 
                   </div>
+
 
                   <p className="mt-2 break-all text-xs text-emerald-600">
 
@@ -824,34 +1058,116 @@ const ShareModal = ({
                 </div>
 
 
+                {/* PUBLIC PERMISSION */}
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+
+                  <div className="mb-3 flex items-center gap-2">
+
+                    {publicPermission ===
+                    "editor" ? (
+
+                      <Pencil
+                        size={16}
+                        className="text-slate-600"
+                      />
+
+                    ) : (
+
+                      <Eye
+                        size={16}
+                        className="text-slate-600"
+                      />
+
+                    )}
+
+                    <div>
+
+                      <p className="text-sm font-semibold text-slate-700">
+                        Link permission
+                      </p>
+
+                      <p className="text-xs text-slate-400">
+                        Control what anyone with this link can do
+                      </p>
+
+                    </div>
+
+                  </div>
+
+
+                  <div className="relative">
+
+                    <select
+                      value={publicPermission}
+                      onChange={
+                        handlePublicPermissionChange
+                      }
+                      disabled={linkLoading}
+                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-3 pr-10 text-sm outline-none disabled:opacity-60"
+                    >
+
+                      <option value="viewer">
+                        Viewer — View only
+                      </option>
+
+                      <option value="editor">
+                        Editor — Can edit
+                      </option>
+
+                    </select>
+
+
+                    <ChevronDown
+                      size={17}
+                      className="pointer-events-none absolute right-3 top-3.5 text-slate-400"
+                    />
+
+                  </div>
+
+                </div>
+
+
+                {/* COPY + REVOKE */}
+
                 <div className="flex gap-3">
 
                   <button
+                    type="button"
                     onClick={handleCopy}
                     className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800"
                   >
 
-                    {copied
-                      ? (
-                        <>
-                          <CheckCircle2 size={17} />
-                          Copied
-                        </>
-                      )
-                      : (
-                        <>
-                          <Copy size={17} />
-                          Copy link
-                        </>
-                      )}
+                    {copied ? (
+
+                      <>
+                        <CheckCircle2
+                          size={17}
+                        />
+
+                        Copied
+
+                      </>
+
+                    ) : (
+
+                      <>
+                        <Copy size={17} />
+
+                        Copy link
+
+                      </>
+
+                    )}
 
                   </button>
 
 
                   <button
+                    type="button"
                     onClick={handleRevoke}
                     disabled={linkLoading}
-                    className="rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50"
+                    className="rounded-xl border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
                   >
                     Revoke
                   </button>

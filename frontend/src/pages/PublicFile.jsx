@@ -8,6 +8,7 @@ import {
   Lock,
   AlertCircle,
   Loader2,
+  Pencil,
 } from "lucide-react";
 
 import {
@@ -197,12 +198,6 @@ const PublicFile = () => {
         err.status === 401
       ) {
 
-        // First request:
-        // No password was provided.
-        //
-        // Backend response:
-        // "Password required"
-
         if (!providedPassword) {
 
           setRequiresPassword(true);
@@ -210,9 +205,6 @@ const PublicFile = () => {
           return;
         }
 
-
-        // Password was provided but
-        // backend rejected it.
 
         setPasswordError(
           err.message ||
@@ -337,6 +329,20 @@ const PublicFile = () => {
 
 
   // ==========================================================
+  // PUBLIC PERMISSION
+  // ==========================================================
+
+  const permission =
+    file?.permission || "viewer";
+
+  const isViewer =
+    permission === "viewer";
+
+  const isEditor =
+    permission === "editor";
+
+
+  // ==========================================================
   // LOADING
   // ==========================================================
 
@@ -374,16 +380,12 @@ const PublicFile = () => {
 
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
 
-          {/* ICON */}
-
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
 
             <Lock size={25} />
 
           </div>
 
-
-          {/* TITLE */}
 
           <div className="mt-5 text-center">
 
@@ -398,8 +400,6 @@ const PublicFile = () => {
 
           </div>
 
-
-          {/* FORM */}
 
           <form
             onSubmit={
@@ -422,16 +422,12 @@ const PublicFile = () => {
             />
 
 
-            {/* PASSWORD ERROR */}
-
             {passwordError && (
               <p className="text-sm text-red-500">
                 {passwordError}
               </p>
             )}
 
-
-            {/* SUBMIT */}
 
             <button
               type="submit"
@@ -461,8 +457,6 @@ const PublicFile = () => {
 
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xl">
 
-          {/* ICON */}
-
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
 
             <AlertCircle
@@ -472,21 +466,15 @@ const PublicFile = () => {
           </div>
 
 
-          {/* TITLE */}
-
           <h1 className="mt-5 text-xl font-bold text-slate-900">
             Unable to access file
           </h1>
 
 
-          {/* MESSAGE */}
-
           <p className="mt-2 text-sm text-slate-500">
             {error}
           </p>
 
-
-          {/* HOME */}
 
           <button
             onClick={() =>
@@ -582,29 +570,67 @@ const PublicFile = () => {
                 {file.name}
               </h1>
 
-              <p className="text-xs text-slate-400">
-                {formatSize(file.size)}
-              </p>
+              <div className="flex items-center gap-2">
+
+                <p className="text-xs text-slate-400">
+                  {formatSize(file.size)}
+                </p>
+
+                <span className="text-slate-300">
+                  •
+                </span>
+
+                <span
+                  className={`text-xs font-medium ${
+                    isEditor
+                      ? "text-slate-700"
+                      : "text-slate-400"
+                  }`}
+                >
+                  {isEditor
+                    ? "Editor access"
+                    : "View only"}
+                </span>
+
+              </div>
 
             </div>
 
           </div>
 
 
-          {/* DOWNLOAD */}
+          {/* ACTIONS */}
 
-          <button
-            onClick={
-              handleDownload
-            }
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-          >
+          <div className="flex items-center gap-2">
 
-            <Download size={17} />
+            {isEditor && (
+              <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 sm:flex">
 
-            Download
+                <Pencil size={14} />
 
-          </button>
+                Editor
+
+              </div>
+            )}
+
+
+            {/* DOWNLOAD */}
+
+            <button
+              type="button"
+              onClick={
+                handleDownload
+              }
+              className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+
+              <Download size={17} />
+
+              Download
+
+            </button>
+
+          </div>
 
         </div>
 
@@ -732,6 +758,7 @@ const PublicFile = () => {
 
 
                 <button
+                  type="button"
                   onClick={
                     handleDownload
                   }
