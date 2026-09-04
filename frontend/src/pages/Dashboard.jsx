@@ -255,14 +255,15 @@ const Dashboard = () => {
     );
 
 
-  const handleNotificationClick = async (
-    notification
-  ) => {
-    if (notification.is_read) {
-      return;
-    }
+const handleNotificationClick = async (
+  notification
+) => {
+  try {
+    // --------------------------------------------------------
+    // MARK AS READ
+    // --------------------------------------------------------
 
-    try {
+    if (!notification.is_read) {
       const updated =
         await notificationService.markAsRead(
           notification.id
@@ -275,13 +276,69 @@ const Dashboard = () => {
             : item
         )
       );
-    } catch (err) {
-      console.error(
-        "Failed to mark notification as read",
-        err
-      );
     }
-  };
+
+    // --------------------------------------------------------
+    // CLOSE NOTIFICATION DROPDOWN
+    // --------------------------------------------------------
+
+    setNotificationOpen(false);
+
+    // --------------------------------------------------------
+    // OPEN SHARED FILE INSIDE DASHBOARD
+    // --------------------------------------------------------
+
+    if (notification.file_id) {
+      try {
+        const file =
+          await fileService.getFile(
+            notification.file_id
+          );
+
+        await handleView(file);
+
+        return;
+      } catch (err) {
+        setError(
+          err.message ||
+            "Unable to open the shared file"
+        );
+
+        return;
+      }
+    }
+
+    // --------------------------------------------------------
+    // OPEN SHARED FOLDER INSIDE DASHBOARD
+    // --------------------------------------------------------
+
+    if (notification.folder_id) {
+      try {
+        const folder =
+          await folderService.getFolder(
+            notification.folder_id
+          );
+
+        await loadFolderContents(
+          folder
+        );
+
+        return;
+      } catch (err) {
+        setError(
+          err.message ||
+            "Unable to open the shared folder"
+        );
+      }
+    }
+
+  } catch (err) {
+    console.error(
+      "Failed to handle notification",
+      err
+    );
+  }
+};
 
 
   const handleMarkAllNotificationsRead =
