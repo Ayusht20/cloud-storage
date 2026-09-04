@@ -123,6 +123,9 @@ def create_share(
 
     db.add(share)
 
+    # Make sure share.id exists before notification references it
+    db.flush()
+
     # --------------------------------------------------------
     # Create notification
     # --------------------------------------------------------
@@ -189,6 +192,7 @@ def create_folder_share(
         select(Folder).where(
             Folder.id == folder_id,
             Folder.owner_id == current_user.id,
+            Folder.is_deleted.is_(False),
         )
     )
 
@@ -253,6 +257,9 @@ def create_folder_share(
     )
 
     db.add(share)
+
+    # Make sure share.id exists before notification references it
+    db.flush()
 
     # --------------------------------------------------------
     # Create notification
@@ -364,6 +371,7 @@ def list_shared_folders(
         )
         .where(
             Share.shared_with_user_id == current_user.id,
+            Folder.is_deleted.is_(False),
         )
         .order_by(
             Share.created_at.desc()
