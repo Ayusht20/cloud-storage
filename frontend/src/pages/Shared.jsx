@@ -17,6 +17,8 @@ import {
 
 import shareService from "../services/shareService";
 import api from "../services/api";
+import Layout from "../components/Layout";
+import FilePreviewModal from "../components/FilePreviewModal";
 
 
 const getFileIcon = (mimeType) => {
@@ -91,6 +93,12 @@ const Shared = () => {
   const [viewingFile, setViewingFile] =
     useState(null);
 
+  const [previewUrl, setPreviewUrl] =
+    useState("");
+
+  const [previewLoading, setPreviewLoading] =
+    useState(false);
+
 
   // ==========================================================
   // LOAD SHARED CONTENT
@@ -163,39 +171,37 @@ const Shared = () => {
 
     try {
 
+      setError("");
+      setViewingFile(file);
+      setPreviewUrl("");
+      setPreviewLoading(true);
+
       const blob =
         await api.getBlob(
           `/files/${encodeURIComponent(
-            file.file_id
+            file.file_id || file.id
           )}/content`
         );
-
 
       const url =
         URL.createObjectURL(
           blob
         );
 
-
-      window.open(
-        url,
-        "_blank",
-        "noopener,noreferrer"
-      );
-
-
-      setTimeout(() => {
-        URL.revokeObjectURL(
-          url
-        );
-      }, 60000);
+      setPreviewUrl(url);
 
     } catch (err) {
+
+      setViewingFile(null);
 
       setError(
         err.message ||
           "Unable to view file"
       );
+
+    } finally {
+
+      setPreviewLoading(false);
 
     }
   };
@@ -270,57 +276,41 @@ const Shared = () => {
   if (loading) {
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-
-        <div className="flex items-center gap-3 text-slate-500">
-
-          <Loader2
-            size={22}
-            className="animate-spin"
-          />
-
-          Loading shared files...
-
+      <Layout>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="flex items-center gap-3 text-slate-500">
+            <Loader2
+              size={22}
+              className="animate-spin"
+            />
+            Loading shared files...
+          </div>
         </div>
-
-      </div>
+      </Layout>
     );
   }
 
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <Layout>
 
-      {/* ====================================================
-          HEADER
-          ==================================================== */}
+      <div className="mx-auto max-w-7xl px-6 py-8">
 
-      <header className="border-b border-slate-200 bg-white">
+        {/* ====================================================
+            HEADER
+            ==================================================== */}
 
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+        <div className="mb-8">
 
-          <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Shared with me
+          </h1>
 
-            <h1 className="text-2xl font-bold text-slate-900">
-              Shared with me
-            </h1>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Files and folders shared with you
-            </p>
-
-          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Files and folders shared with you
+          </p>
 
         </div>
-
-      </header>
-
-
-      {/* ====================================================
-          CONTENT
-          ==================================================== */}
-
-      <main className="mx-auto max-w-7xl px-6 py-8">
 
         {error && (
           <div className="mb-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -575,9 +565,40 @@ const Shared = () => {
 
         </section>
 
-      </main>
+      </div>
 
-    </div>
+      {/* ====================================================
+          PREVIEW MODAL
+          ==================================================== */}
+
+      {viewingFile && (
+        <FilePreviewModal
+          file={{
+            ...viewingFile,
+            id: viewingFile.file_id,
+            name:
+              viewingFile.file_name ||
+              viewingFile.original_name ||
+              "Shared file",
+          }}
+          previewUrl={previewUrl}
+          loading={previewLoading}
+          onClose={() => {
+            if (previewUrl) {
+              URL.revokeObjectURL(
+                previewUrl
+              );
+            }
+
+            setViewingFile(null);
+            setPreviewUrl("");
+            setPreviewLoading(false);
+          }}
+          onDownload={handleDownload}
+        />
+      )}
+
+    </Layout>
   );
 };
 
