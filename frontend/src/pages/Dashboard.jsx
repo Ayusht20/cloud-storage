@@ -41,6 +41,39 @@ const ROOT_FOLDER = {
 const Dashboard = () => {
   const { user, logout } = useAuth();
 
+  // ==================================================
+  // PERMISSIONS
+  // ==================================================
+
+  const getPermission = (item) => {
+    if (
+      item?.owner_id &&
+      user?.id &&
+      item.owner_id === user.id
+    ) {
+      return "owner";
+    }
+
+    return (
+      item?.permission ||
+      item?.role ||
+      "owner"
+    );
+  };
+
+  const canEditItem = (item) => {
+    const permission = getPermission(item);
+
+    return (
+      permission === "owner" ||
+      permission === "editor"
+    );
+  };
+
+  const canShareItem = (item) => {
+    return getPermission(item) === "owner";
+  };
+
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
 
@@ -1475,15 +1508,21 @@ const handleNotificationClick = async (
                   {filteredFolders.map(
                     (folder) => (
 
-<FolderCard
+<div
   key={folder.id}
-  folder={folder}
-  onOpen={handleFolderOpen}
-  // onRename={handleRenameFolder}
-  // onShare={handleShareFolder}
-  // onMove={handleMoveFolder}
-  onDelete={handleDeleteFolder}
-/>
+  className="relative z-20"
+>
+  <FolderCard
+    folder={folder}
+    permission={getPermission(folder)}
+    onOpen={handleFolderOpen}
+    onDelete={
+      canEditItem(folder)
+        ? handleDeleteFolder
+        : undefined
+    }
+  />
+</div>
 
                     )
                   )}
@@ -1547,32 +1586,37 @@ const handleNotificationClick = async (
                   {filteredFiles.map(
                     (file) => (
 
-                      <FileCard
-                        key={
-                          file.id
-                        }
-                        file={
-                          file
-                        }
-                        onView={
-                          handleView
-                        }
-                        onDownload={
-                          handleDownload
-                        }
-                        onRename={
-                          handleRename
-                        }
-                        onMove={
-                          handleMove
-                        }
-                        onShare={
-                          handleShare
-                        }
-                        onDelete={
-                          handleDeleteFile
-                        }
-                      />
+                      <div
+                        key={file.id}
+                        className="relative z-0"
+                      >
+                        <FileCard
+                          file={file}
+                          permission={getPermission(file)}
+                          onView={handleView}
+                          onDownload={handleDownload}
+                          onRename={
+                            canEditItem(file)
+                              ? handleRename
+                              : undefined
+                          }
+                          onMove={
+                            canEditItem(file)
+                              ? handleMove
+                              : undefined
+                          }
+                          onShare={
+                            canShareItem(file)
+                              ? handleShare
+                              : undefined
+                          }
+                          onDelete={
+                            canEditItem(file)
+                              ? handleDeleteFile
+                              : undefined
+                          }
+                        />
+                      </div>
 
                     )
                   )}

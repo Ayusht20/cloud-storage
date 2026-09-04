@@ -7,6 +7,7 @@ from fastapi import (
 )
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from app.models.share import Share
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -28,6 +29,7 @@ from app.services.permission_service import (
     can_delete_folder,
     can_edit_folder,
     get_folder_permission,
+    get_file_permission,
 )
 
 
@@ -154,20 +156,24 @@ def list_root_folders(
     ).all()
 
     return [
-        FolderListResponse(
-            id=str(folder.id),
-            name=folder.name,
-            parent_id=(
-                str(folder.parent_id)
-                if folder.parent_id
-                else None
-            ),
-        )
-        for folder in folders
+    FolderListResponse(
+        id=str(folder.id),
+        name=folder.name,
+        parent_id=(
+            str(folder.parent_id)
+            if folder.parent_id
+            else None
+        ),
+        permission=Permission.OWNER.value,
+    )
+    for folder in folders
     ]
 
 
-# Keep this route before /{folder_id}.
+# ============================================================
+# ROOT CONTENTS
+# ============================================================
+
 @router.get(
     "/contents",
     response_model=FolderContentsResponse,
@@ -176,7 +182,11 @@ def get_root_contents(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    folders = db.scalars(
+    # --------------------------------------------------------
+    # OWNED ROOT FOLDERS
+    # --------------------------------------------------------
+
+    owned_folders = db.scalars(
         select(Folder)
         .where(
             Folder.owner_id == current_user.id,
@@ -186,7 +196,41 @@ def get_root_contents(
         .order_by(Folder.name.asc())
     ).all()
 
-    files = db.scalars(
+    # --------------------------------------------------------
+    # SHARED ROOT FOLDERS
+    #
+    # Only directly shared root folders are placed here.
+    # Children of a shared folder are handled when opening
+    # that folder.
+    # --------------------------------------------------------
+
+    shared_folder_ids = db.scalars(
+        select(Share.folder_id)
+        .where(
+            Share.folder_id.is_not(None),
+            Share.shared_with_user_id == current_user.id,
+        )
+    ).all()
+
+    shared_folders = []
+
+    if shared_folder_ids:
+        shared_folders = db.scalars(
+            select(Folder)
+            .where(
+                Folder.id.in_(shared_folder_ids),
+                Folder.parent_id.is_(None),
+                Folder.is_deleted.is_(False),
+                Folder.owner_id != current_user.id,
+            )
+            .order_by(Folder.name.asc())
+        ).all()
+
+    # --------------------------------------------------------
+    # OWNED ROOT FILES
+    # --------------------------------------------------------
+
+    owned_files = db.scalars(
         select(File)
         .where(
             File.owner_id == current_user.id,
@@ -196,45 +240,131 @@ def get_root_contents(
         .order_by(File.name.asc())
     ).all()
 
+    # --------------------------------------------------------
+    # SHARED ROOT FILES
+    # --------------------------------------------------------
+
+    shared_file_ids = db.scalars(
+        select(Share.file_id)
+        .where(
+            Share.file_id.is_not(None),
+            Share.shared_with_user_id == current_user.id,
+        )
+    ).all()
+
+    shared_files = []
+
+    if shared_file_ids:
+        shared_files = db.scalars(
+            select(File)
+            .where(
+                File.id.in_(shared_file_ids),
+                File.folder_id.is_(None),
+                File.is_deleted.is_(False),
+                File.owner_id != current_user.id,
+            )
+            .order_by(File.name.asc())
+        ).all()
+
+    # --------------------------------------------------------
+    # COMBINE
+    # --------------------------------------------------------
+
+    all_folders = owned_folders + shared_folders
+    all_files = owned_files + shared_files
+
+    # --------------------------------------------------------
+    # RESPONSE
+    # --------------------------------------------------------
+
     return FolderContentsResponse(
         folder=None,
+
         breadcrumbs=[
             BreadcrumbItem(
                 id=None,
                 name="My Drive",
             )
         ],
+
         folders=[
             FolderListResponse(
                 id=str(folder.id),
                 name=folder.name,
-                parent_id=None,
+                parent_id=(
+                    str(folder.parent_id)
+                    if folder.parent_id
+                    else None
+                ),
+                permission=(
+                    Permission.OWNER.value
+                    if folder.owner_id == current_user.id
+                    else get_folder_permission(
+                        folder,
+                        current_user,
+                        db,
+                    ).value
+                ),
             )
-            for folder in folders
+            for folder in all_folders
+            if (
+                folder.owner_id == current_user.id
+                or get_folder_permission(
+                    folder,
+                    current_user,
+                    db,
+                ) != Permission.NONE
+            )
         ],
+
         files=[
             FileListResponse(
                 id=str(file.id),
                 name=file.name,
                 mime_type=file.mime_type,
                 size=file.size,
-                folder_id=None,
+                folder_id=(
+                    str(file.folder_id)
+                    if file.folder_id
+                    else None
+                ),
                 is_deleted=file.is_deleted,
+                permission=(
+                    Permission.OWNER.value
+                    if file.owner_id == current_user.id
+                    else get_file_permission(
+                        file,
+                        current_user,
+                        db,
+                    ).value
+                ),
             )
-            for file in files
+            for file in all_files
+            if (
+                file.owner_id == current_user.id
+                or get_file_permission(
+                    file,
+                    current_user,
+                    db,
+                ) != Permission.NONE
+            )
         ],
     )
 
 
-# Keep this route before /{folder_id}.
 @router.get(
     "/{folder_id}/contents",
+    response_model=FolderContentsResponse,
 )
 def get_folder_contents(
     folder_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # --------------------------------------------------------
+    # GET FOLDER
+    # --------------------------------------------------------
+
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
@@ -248,37 +378,102 @@ def get_folder_contents(
             detail="Folder not found",
         )
 
-    permission = get_folder_permission(
+    # --------------------------------------------------------
+    # CHECK CURRENT USER PERMISSION
+    # --------------------------------------------------------
+
+    folder_permission = get_folder_permission(
         folder,
         current_user,
         db,
     )
 
-    if permission == Permission.NONE:
+    if folder_permission == Permission.NONE:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Folder not found",
         )
 
+    # --------------------------------------------------------
+    # CHILD FOLDERS
+    # --------------------------------------------------------
+
     folders = db.scalars(
-        select(Folder).where(
+        select(Folder)
+        .where(
             Folder.parent_id == folder.id,
             Folder.is_deleted.is_(False),
-        ).order_by(Folder.name.asc())
+        )
+        .order_by(Folder.name.asc())
     ).all()
+
+    # --------------------------------------------------------
+    # CHILD FILES
+    # --------------------------------------------------------
 
     files = db.scalars(
-        select(File).where(
+        select(File)
+        .where(
             File.folder_id == folder.id,
             File.is_deleted.is_(False),
-        ).order_by(File.name.asc())
+        )
+        .order_by(File.name.asc())
     ).all()
 
-    return {
-        "folders": folders,
-        "files": files,
-    }
+    # --------------------------------------------------------
+    # RESPONSE
+    # --------------------------------------------------------
 
+    return FolderContentsResponse(
+        folder=None,
+
+        breadcrumbs=[],
+
+        folders=[
+            FolderListResponse(
+                id=str(child.id),
+                name=child.name,
+                parent_id=str(child.parent_id)
+                if child.parent_id
+                else None,
+                permission=get_folder_permission(
+                    child,
+                    current_user,
+                    db,
+                ).value,
+            )
+            for child in folders
+            if get_folder_permission(
+                child,
+                current_user,
+                db,
+            ) != Permission.NONE
+        ],
+
+        files=[
+            FileListResponse(
+                id=str(file.id),
+                name=file.name,
+                mime_type=file.mime_type,
+                size=file.size,
+                folder_id=str(file.folder_id)
+                if file.folder_id
+                else None,
+                is_deleted=file.is_deleted,
+                permission=get_file_permission(
+                    file,
+                    current_user,
+                    db,
+                ).value,
+            )
+            for file in files
+            if get_file_permission(
+                file,
+                current_user,
+                db,
+            ) != Permission.NONE
+        ],
+    )
 
 @router.get(
     "/{folder_id}",

@@ -7,11 +7,16 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 
 const FolderCard = ({
   folder,
+  permission,
   onOpen,
   onRename,
   onShare,
@@ -26,7 +31,24 @@ const FolderCard = ({
 
 
   // ==================================================
-  // CLOSE MENU WHEN CLICKING OUTSIDE
+  // PERMISSIONS
+  // ==================================================
+
+  const canEdit =
+    permission === "owner" ||
+    permission === "editor";
+
+  const canShare =
+    permission === "owner";
+
+
+  const isShared =
+    permission &&
+    permission !== "owner";
+
+
+  // ==================================================
+  // CLOSE MENU OUTSIDE
   // ==================================================
 
   useEffect(() => {
@@ -46,12 +68,10 @@ const FolderCard = ({
 
     };
 
-
     document.addEventListener(
       "mousedown",
       handleClickOutside
     );
-
 
     return () => {
       document.removeEventListener(
@@ -82,7 +102,7 @@ const FolderCard = ({
 
   return (
     <div
-      className="group relative flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+      className="group relative z-0 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
     >
 
       {/* ==================================================
@@ -104,13 +124,34 @@ const FolderCard = ({
 
         <div className="min-w-0 flex-1">
 
-          <p className="truncate font-semibold text-slate-800">
+          <p
+            className="truncate font-semibold text-slate-800"
+            title={folder.name}
+          >
             {folder.name}
           </p>
 
-          <p className="mt-1 text-xs text-slate-400">
-            Folder
-          </p>
+
+          <div className="mt-2 flex items-center gap-2">
+
+            <p className="text-xs text-slate-400">
+              Folder
+            </p>
+
+            {isShared && (
+              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">
+                Shared
+              </span>
+            )}
+
+          </div>
+
+
+          {isShared && (
+            <p className="mt-1 text-xs capitalize text-slate-400">
+              {permission}
+            </p>
+          )}
 
         </div>
 
@@ -123,7 +164,7 @@ const FolderCard = ({
 
       <div
         ref={menuRef}
-        className="relative shrink-0"
+        className="relative z-50 shrink-0"
       >
 
         <button
@@ -156,7 +197,7 @@ const FolderCard = ({
         {menuOpen && (
 
           <div
-            className="absolute right-0 top-11 z-50 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+            className="absolute right-0 top-full z-[100] mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
             onClick={(event) =>
               event.stopPropagation()
             }
@@ -164,89 +205,87 @@ const FolderCard = ({
 
             {/* RENAME */}
 
-            <button
-              type="button"
-              onClick={() =>
-                handleAction(
-                  onRename
-                )
-              }
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
-            >
-
-              <Pencil
-                size={16}
-              />
-
-              Rename
-
-            </button>
+            {canEdit && onRename && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleAction(
+                    onRename
+                  )
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+              >
+                <Pencil size={16} />
+                Rename
+              </button>
+            )}
 
 
-            {/* SHARE */}
+            {/* SHARE — OWNER ONLY */}
 
-            <button
-              type="button"
-              onClick={() =>
-                handleAction(
-                  onShare
-                )
-              }
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
-            >
-
-              <Share2
-                size={16}
-              />
-
-              Share
-
-            </button>
+            {canShare && onShare && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleAction(
+                    onShare
+                  )
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+              >
+                <Share2 size={16} />
+                Share
+              </button>
+            )}
 
 
             {/* MOVE */}
 
-            <button
-              type="button"
-              onClick={() =>
-                handleAction(
-                  onMove
-                )
-              }
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
-            >
-
-              <Move
-                size={16}
-              />
-
-              Move
-
-            </button>
+            {canEdit && onMove && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleAction(
+                    onMove
+                  )
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+              >
+                <Move size={16} />
+                Move
+              </button>
+            )}
 
 
-            <div className="my-1 border-t border-slate-100" />
+            {/* DELETE */}
+
+            {canEdit && onDelete && (
+              <>
+                <div className="my-1 border-t border-slate-100" />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleAction(
+                      onDelete
+                    )
+                  }
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
+                >
+                  <Trash2 size={16} />
+                  Move to Trash
+                </button>
+              </>
+            )}
 
 
-            {/* MOVE TO TRASH */}
+            {/* VIEWER */}
 
-            <button
-              type="button"
-              onClick={() =>
-                handleAction(
-                  onDelete
-                )
-              }
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
-            >
-
-              <Trash2
-                size={16}
-              />
-
-              Move to Trash
-
-            </button>
+            {permission === "viewer" && (
+              <div className="px-4 py-2.5 text-xs text-slate-400">
+                View only
+              </div>
+            )}
 
           </div>
 

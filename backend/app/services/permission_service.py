@@ -16,7 +16,14 @@ class Permission(str, Enum):
     NONE = "none"
 
 
-def _role_to_permission(role: str) -> Permission:
+# ==========================================================
+# ROLE → PERMISSION
+# ==========================================================
+
+def _role_to_permission(
+    role: str | None,
+) -> Permission:
+
     if role == Permission.EDITOR.value:
         return Permission.EDITOR
 
@@ -26,6 +33,10 @@ def _role_to_permission(role: str) -> Permission:
     return Permission.NONE
 
 
+# ==========================================================
+# FOLDER PERMISSION
+# ==========================================================
+
 def get_folder_permission(
     folder: Folder,
     current_user: User,
@@ -34,16 +45,43 @@ def get_folder_permission(
     """
     Determine the user's permission for a folder.
 
-    Permission is inherited from the nearest shared folder
-    while walking up the folder hierarchy.
+    Priority:
+
+    1. Folder owner
+    2. Direct share on the folder
+    3. Nearest shared parent folder
+    4. No permission
     """
+
+    # ------------------------------------------------------
+    # OWNER
+    # ------------------------------------------------------
 
     if folder.owner_id == current_user.id:
         return Permission.OWNER
 
+    # ------------------------------------------------------
+    # WALK UP THE FOLDER TREE
+    # ------------------------------------------------------
+
     current_folder = folder
 
+    visited_folder_ids = set()
+
     while current_folder:
+
+        # Prevent accidental infinite loops
+        if current_folder.id in visited_folder_ids:
+            break
+
+        visited_folder_ids.add(
+            current_folder.id
+        )
+
+        # --------------------------------------------------
+        # CHECK SHARE ON CURRENT FOLDER
+        # --------------------------------------------------
+
         share = db.scalar(
             select(Share).where(
                 Share.folder_id == current_folder.id,
@@ -52,7 +90,13 @@ def get_folder_permission(
         )
 
         if share:
-            return _role_to_permission(share.role)
+            return _role_to_permission(
+                share.role
+            )
+
+        # --------------------------------------------------
+        # MOVE TO PARENT
+        # --------------------------------------------------
 
         if not current_folder.parent_id:
             break
@@ -65,6 +109,10 @@ def get_folder_permission(
 
     return Permission.NONE
 
+
+# ==========================================================
+# FILE PERMISSION
+# ==========================================================
 
 def get_file_permission(
     file: File,
@@ -79,11 +127,22 @@ def get_file_permission(
     1. File owner
     2. Direct file share
     3. Shared parent folder
-    4. No access
+    4. No permission
+
+    A direct file share takes priority over
+    inherited folder permission.
     """
+
+    # ------------------------------------------------------
+    # OWNER
+    # ------------------------------------------------------
 
     if file.owner_id == current_user.id:
         return Permission.OWNER
+
+    # ------------------------------------------------------
+    # DIRECT FILE SHARE
+    # ------------------------------------------------------
 
     direct_share = db.scalar(
         select(Share).where(
@@ -97,7 +156,12 @@ def get_file_permission(
             direct_share.role
         )
 
+    # ------------------------------------------------------
+    # INHERIT FROM FOLDER
+    # ------------------------------------------------------
+
     if file.folder_id:
+
         folder = db.scalar(
             select(Folder).where(
                 Folder.id == file.folder_id
@@ -114,11 +178,16 @@ def get_file_permission(
     return Permission.NONE
 
 
+# ==========================================================
+# FILE — VIEW
+# ==========================================================
+
 def can_view(
     file: File,
     current_user: User,
     db: Session,
 ) -> bool:
+
     permission = get_file_permission(
         file,
         current_user,
@@ -132,11 +201,16 @@ def can_view(
     }
 
 
+# ==========================================================
+# FILE — EDIT
+# ==========================================================
+
 def can_edit(
     file: File,
     current_user: User,
     db: Session,
 ) -> bool:
+
     permission = get_file_permission(
         file,
         current_user,
@@ -148,12 +222,17 @@ def can_edit(
         Permission.EDITOR,
     }
 
+
+# ==========================================================
+# FILE — DELETE
+# ==========================================================
 
 def can_delete(
     file: File,
     current_user: User,
     db: Session,
 ) -> bool:
+
     permission = get_file_permission(
         file,
         current_user,
@@ -166,11 +245,16 @@ def can_delete(
     }
 
 
+# ==========================================================
+# FILE — SHARE
+# ==========================================================
+
 def can_share(
     file: File,
     current_user: User,
     db: Session,
 ) -> bool:
+
     permission = get_file_permission(
         file,
         current_user,
@@ -179,11 +263,17 @@ def can_share(
 
     return permission == Permission.OWNER
 
+
+# ==========================================================
+# FOLDER — VIEW
+# ==========================================================
+
 def can_view_folder(
     folder: Folder,
     current_user: User,
     db: Session,
 ) -> bool:
+
     permission = get_folder_permission(
         folder,
         current_user,
@@ -197,11 +287,16 @@ def can_view_folder(
     }
 
 
+# ==========================================================
+# FOLDER — EDIT
+# ==========================================================
+
 def can_edit_folder(
     folder: Folder,
     current_user: User,
     db: Session,
 ) -> bool:
+
     permission = get_folder_permission(
         folder,
         current_user,
@@ -214,11 +309,16 @@ def can_edit_folder(
     }
 
 
+# ==========================================================
+# FOLDER — DELETE
+# ==========================================================
+
 def can_delete_folder(
     folder: Folder,
     current_user: User,
     db: Session,
 ) -> bool:
+
     permission = get_folder_permission(
         folder,
         current_user,

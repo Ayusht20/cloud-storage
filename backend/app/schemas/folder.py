@@ -21,7 +21,7 @@ class FolderListResponse(BaseModel):
     id: str
     name: str
     parent_id: str | None
-
+    permission: str
 
 class FolderUpdateRequest(BaseModel):
     name: str = Field(

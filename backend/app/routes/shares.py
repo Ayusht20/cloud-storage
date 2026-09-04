@@ -131,19 +131,19 @@ def create_share(
     # --------------------------------------------------------
 
     notification = Notification(
-        user_id=target_user.id,
-        type="file_shared",
-        title="New file shared",
-        message=(
-            f"{file_record.name} was shared with you "
-            f"as {share.role.title()}."
-        ),
-        file_id=file_record.id,
-        folder_id=None,
-        share_id=share.id,
-        is_read=False,
-    )
-
+    user_id=target_user.id,
+    type="file_shared",
+    title="File shared with you",
+    message=(
+        f"{current_user.email} shared "
+        f'"{file_record.name}" with you '
+        f"as {share.role.title()}."
+    ),
+    file_id=file_record.id,
+    folder_id=None,
+    share_id=share.id,
+    is_read=False,
+)
     db.add(notification)
 
     # --------------------------------------------------------

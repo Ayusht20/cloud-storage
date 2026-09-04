@@ -21,7 +21,7 @@ class FileListResponse(BaseModel):
     size: int
     folder_id: str | None
     is_deleted: bool
-
+    permission: str
 
 class FileUpdateRequest(BaseModel):
     name: str = Field(
