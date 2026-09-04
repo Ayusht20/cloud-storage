@@ -7,6 +7,7 @@ from fastapi import (
     HTTPException,
     status,
 )
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,6 +27,7 @@ from app.schemas.public_link import (
     PublicFileResponse,
     PublicLinkAccessRequest,
     PublicLinkCreateRequest,
+    PublicLinkPermissionUpdateRequest,
     PublicLinkResponse,
 )
 
@@ -238,11 +240,11 @@ def create_public_link(
 
     public_link = PublicLink(
         token=token,
+
         file_id=file_id,
+
         folder_id=folder_id,
 
-        # Public links default to viewer
-        # unless editor was explicitly selected.
         permission=link_data.permission.value,
 
         password_hash=(
@@ -254,12 +256,14 @@ def create_public_link(
         ),
 
         expires_at=expires_at,
+
         is_active=True,
     )
 
     db.add(public_link)
 
     db.commit()
+
     db.refresh(public_link)
 
     # --------------------------------------------------------
@@ -360,9 +364,103 @@ def list_public_links(
 
             created_at=link.created_at,
         )
-
         for link in links
     ]
+
+
+# ============================================================
+# UPDATE PUBLIC LINK PERMISSION
+#
+# PATCH /public-links/{link_id}/permission
+#
+# OWNER ONLY
+#
+# Allows:
+#
+# viewer -> editor
+# editor -> viewer
+# ============================================================
+
+@router.patch(
+    "/{link_id}/permission",
+    response_model=PublicLinkResponse,
+)
+def update_public_link_permission(
+    link_id: str,
+    link_data: PublicLinkPermissionUpdateRequest,
+    current_user: User = Depends(
+        get_current_user
+    ),
+    db: Session = Depends(get_db),
+):
+
+    public_link = db.scalar(
+        select(PublicLink)
+        .outerjoin(
+            File,
+            PublicLink.file_id == File.id,
+        )
+        .outerjoin(
+            Folder,
+            PublicLink.folder_id == Folder.id,
+        )
+        .where(
+            PublicLink.id == link_id,
+            (
+                File.owner_id == current_user.id
+            )
+            |
+            (
+                Folder.owner_id == current_user.id
+            ),
+        )
+    )
+
+    if not public_link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Public link not found",
+        )
+
+    if not public_link.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Public link is inactive",
+        )
+
+    public_link.permission = (
+        link_data.permission.value
+    )
+
+    db.commit()
+
+    db.refresh(public_link)
+
+    return PublicLinkResponse(
+        id=str(public_link.id),
+
+        token=public_link.token,
+
+        file_id=(
+            str(public_link.file_id)
+            if public_link.file_id
+            else None
+        ),
+
+        folder_id=(
+            str(public_link.folder_id)
+            if public_link.folder_id
+            else None
+        ),
+
+        permission=public_link.permission,
+
+        expires_at=public_link.expires_at,
+
+        is_active=public_link.is_active,
+
+        created_at=public_link.created_at,
+    )
 
 
 # ============================================================
@@ -627,8 +725,6 @@ def get_public_folder_contents(
             "id": str(folder.id),
 
             "name": folder.name,
-
-            "permission": public_link.permission,
         },
 
         "permission": public_link.permission,
@@ -644,10 +740,7 @@ def get_public_folder_contents(
                     if child.parent_id
                     else None
                 ),
-
-                "permission": public_link.permission,
             }
-
             for child in folders
         ],
 
@@ -665,10 +758,7 @@ def get_public_folder_contents(
                     public_id=file.storage_public_id,
                     resource_type=file.resource_type,
                 ),
-
-                "permission": public_link.permission,
             }
-
             for file in files
         ],
     }

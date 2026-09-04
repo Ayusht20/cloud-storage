@@ -40,9 +40,7 @@ class PublicLink(Base):
         index=True,
     )
 
-    # ==================================================
-    # PUBLIC LINK PERMISSION
-    # ==================================================
+
 
     permission: Mapped[str] = mapped_column(
         String(20),

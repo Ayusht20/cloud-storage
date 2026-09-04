@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PublicLinkPermission(str, Enum):
@@ -15,9 +15,14 @@ class PublicLinkCreateRequest(BaseModel):
 
     password: str | None = None
 
-    permission: PublicLinkPermission = (
-        PublicLinkPermission.VIEWER
+    permission: PublicLinkPermission = Field(
+        default=PublicLinkPermission.VIEWER
     )
+
+
+class PublicLinkPermissionUpdateRequest(BaseModel):
+
+    permission: PublicLinkPermission
 
 
 class PublicLinkResponse(BaseModel):
