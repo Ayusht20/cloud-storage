@@ -1164,9 +1164,9 @@ const Dashboard = () => {
   key={folder.id}
   folder={folder}
   onOpen={handleFolderOpen}
-  onRename={handleRenameFolder}
-  onShare={handleShareFolder}
-  onMove={handleMoveFolder}
+  // onRename={handleRenameFolder}
+  // onShare={handleShareFolder}
+  // onMove={handleMoveFolder}
   onDelete={handleDeleteFolder}
 />
 

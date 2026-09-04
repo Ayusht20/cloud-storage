@@ -636,7 +636,7 @@ def move_folder(
 
 @router.delete(
     "/{folder_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=FolderResponse,
 )
 def delete_folder(
     folder_id: str,
@@ -646,6 +646,7 @@ def delete_folder(
     folder = db.scalar(
         select(Folder).where(
             Folder.id == folder_id,
+            Folder.owner_id == current_user.id,
             Folder.is_deleted.is_(False),
         )
     )
@@ -656,19 +657,19 @@ def delete_folder(
             detail="Folder not found",
         )
 
-    if not can_delete_folder(
-        folder,
-        current_user,
-        db,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to delete this folder",
-        )
+    folder.is_deleted = True
 
-    db.delete(folder)
     db.commit()
+    db.refresh(folder)
 
-    return Response(
-        status_code=status.HTTP_204_NO_CONTENT
+    return FolderResponse(
+        id=str(folder.id),
+        name=folder.name,
+        owner_id=str(folder.owner_id),
+        parent_id=(
+            str(folder.parent_id)
+            if folder.parent_id
+            else None
+        ),
+        is_deleted=folder.is_deleted,
     )
