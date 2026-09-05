@@ -103,24 +103,22 @@ const publicLinkService = {
   // GET PUBLIC FILE CONTENT
   // ==========================================================
 
-  getPublicFileContent(
-    token,
-    fileId,
-    password = null
-  ) {
-    return api.get(
-      `/public/${encodeURIComponent(
-        token
-      )}/file/${encodeURIComponent(
-        fileId
-      )}/content`,
-      {
-        params: {
-          password,
-        },
-      }
-    );
-  },
+getPublicFileContent(
+  token,
+  fileId,
+  password = null
+) {
+  return api.post(
+    `/public/${encodeURIComponent(
+      token
+    )}/file/${encodeURIComponent(
+      fileId
+    )}/content`,
+    {
+      password,
+    }
+  );
+},
 
 
   // ==========================================================

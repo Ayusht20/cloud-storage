@@ -912,17 +912,22 @@ def _is_text_editable(file: File) -> bool:
 # PUBLIC EDITOR - GET FILE CONTENT
 # ============================================================
 
-@public_access_router.get(
+@public_access_router.post(
     "/public/{token}/file/{file_id}/content",
-    response_model=PublicFileContentResponse,
 )
 def public_get_file_content(
     token: str,
     file_id: str,
-    password: str | None = None,
+    access_data: PublicLinkAccessRequest | None = None,
     db: Session = Depends(get_db),
 ):
     public_link = get_active_public_link(token, db)
+
+    password = (
+        access_data.password
+        if access_data
+        else None
+    )
 
     verify_public_link_password(
         public_link,

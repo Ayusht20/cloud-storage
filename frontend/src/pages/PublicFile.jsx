@@ -14,10 +14,7 @@ import {
   Check,
 } from "lucide-react";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+
 
 import {
   useParams,
@@ -26,6 +23,11 @@ import {
 
 import publicLinkService from "../services/publicLinkService";
 
+import React, {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 // ============================================================
 // FORMAT FILE SIZE
@@ -175,7 +177,8 @@ const PublicFile = () => {
 
   const [password, setPassword] =
     useState("");
-
+  const passwordRef =
+  useRef("");
   const [requiresPassword, setRequiresPassword] =
     useState(false);
 
@@ -211,138 +214,153 @@ const PublicFile = () => {
   // ACCESS PUBLIC LINK
   // ==========================================================
 
-  const loadPublicFile = async (
-    providedPassword = null
-  ) => {
+const loadPublicFile = async (
+  providedPassword = null
+) => {
 
-    setLoading(true);
+  setLoading(true);
 
-    setError("");
+  setError("");
 
-    setPasswordError("");
-
-
-    try {
-
-      const data =
-        await publicLinkService.accessLink(
-          token,
-          providedPassword
-        );
+  setPasswordError("");
 
 
-      // ------------------------------------------------------
-      // PUBLIC FOLDER
-      // ------------------------------------------------------
+  // ==========================================================
+  // KEEP PASSWORD IN BOTH STATE AND REF
+  // ==========================================================
 
-      if (
-        data?.type === "folder"
-      ) {
+  if (providedPassword) {
 
-        navigate(
-          `/public/${token}/folder`,
-          {
-            replace: true,
-          }
-        );
+    passwordRef.current =
+      providedPassword;
 
-        return;
-      }
+    setPassword(
+      providedPassword
+    );
+  }
 
 
-      // ------------------------------------------------------
-      // PUBLIC FILE
-      // ------------------------------------------------------
+  try {
 
-      setFile(data);
-
-      setRequiresPassword(false);
-
-    } catch (err) {
-
-      console.log(
-        "PUBLIC LINK ERROR:",
-        err.status,
-        err.message,
-        err.data
+    const data =
+      await publicLinkService.accessLink(
+        token,
+        providedPassword
       );
 
 
-      // ------------------------------------------------------
-      // PASSWORD REQUIRED / INVALID PASSWORD
-      // ------------------------------------------------------
+    // ========================================================
+    // PUBLIC FOLDER
+    // ========================================================
 
-      if (
-        err.status === 401
-      ) {
+    if (
+      data?.type === "folder"
+    ) {
 
-        if (!providedPassword) {
-
-          setRequiresPassword(true);
-
-          return;
+      navigate(
+        `/public/${token}/folder`,
+        {
+          replace: true,
         }
+      );
+
+      return;
+    }
 
 
-        setPasswordError(
-          err.message ||
-            "Invalid password"
-        );
+    // ========================================================
+    // PUBLIC FILE
+    // ========================================================
 
-        setRequiresPassword(true);
+    setFile(data);
 
-        return;
-      }
+    setRequiresPassword(false);
 
+  } catch (err) {
 
-      // ------------------------------------------------------
-      // EXPIRED LINK
-      // ------------------------------------------------------
-
-      if (
-        err.status === 410
-      ) {
-
-        setError(
-          "This public link has expired."
-        );
-
-        return;
-      }
+    console.log(
+      "PUBLIC LINK ERROR:",
+      err.status,
+      err.message,
+      err.data
+    );
 
 
-      // ------------------------------------------------------
-      // NOT FOUND
-      // ------------------------------------------------------
+    // ========================================================
+    // PASSWORD REQUIRED / INVALID PASSWORD
+    // ========================================================
 
-      if (
-        err.status === 404
-      ) {
+    if (
+      err.status === 401
+    ) {
 
-        setError(
-          err.message ||
-            "This public link is no longer available."
+      if (!providedPassword) {
+
+        setRequiresPassword(
+          true
         );
 
         return;
       }
 
 
-      // ------------------------------------------------------
-      // OTHER ERROR
-      // ------------------------------------------------------
+      setPasswordError(
+        err.message ||
+          "Invalid password"
+      );
+
+      setRequiresPassword(
+        true
+      );
+
+      return;
+    }
+
+
+    // ========================================================
+    // EXPIRED
+    // ========================================================
+
+    if (
+      err.status === 410
+    ) {
+
+      setError(
+        "This public link has expired."
+      );
+
+      return;
+    }
+
+
+    // ========================================================
+    // NOT FOUND
+    // ========================================================
+
+    if (
+      err.status === 404
+    ) {
 
       setError(
         err.message ||
-          "Unable to access this file"
+          "This public link is no longer available."
       );
 
-    } finally {
-
-      setLoading(false);
-
+      return;
     }
-  };
+
+
+    setError(
+      err.message ||
+        "Unable to access this file"
+    );
+
+  } finally {
+
+    setLoading(false);
+
+  }
+};
 
 
   // ==========================================================
@@ -362,27 +380,31 @@ const PublicFile = () => {
   // PASSWORD SUBMIT
   // ==========================================================
 
-  const handlePasswordSubmit = async (
-    event
-  ) => {
+const handlePasswordSubmit = async (
+  event
+) => {
 
-    event.preventDefault();
-
-
-    if (!password.trim()) {
-
-      setPasswordError(
-        "Please enter the password"
-      );
-
-      return;
-    }
+  event.preventDefault();
 
 
-    await loadPublicFile(
-      password
+  if (!password.trim()) {
+
+    setPasswordError(
+      "Please enter the password"
     );
-  };
+
+    return;
+  }
+
+
+  passwordRef.current =
+    password;
+
+
+  await loadPublicFile(
+    password
+  );
+};
 
 
   // ==========================================================
@@ -426,7 +448,7 @@ const PublicFile = () => {
         await publicLinkService.getPublicFileContent(
           token,
           file.id,
-          password || null
+          passwordRef.current || null
         );
 
       setEditorContent(
@@ -469,7 +491,7 @@ const PublicFile = () => {
           token,
           file.id,
           editorContent,
-          password || null
+         passwordRef.current || null
         );
 
       setFile((current) => ({
