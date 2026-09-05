@@ -100,6 +100,126 @@ const publicLinkService = {
 
 
   // ==========================================================
+  // GET PUBLIC FILE CONTENT
+  // ==========================================================
+
+  getPublicFileContent(
+    token,
+    fileId,
+    password = null
+  ) {
+    return api.get(
+      `/public/${encodeURIComponent(
+        token
+      )}/file/${encodeURIComponent(
+        fileId
+      )}/content`,
+      {
+        params: {
+          password,
+        },
+      }
+    );
+  },
+
+
+  // ==========================================================
+  // UPDATE PUBLIC FILE CONTENT
+  // ==========================================================
+
+  updatePublicFileContent(
+    token,
+    fileId,
+    content,
+    password = null
+  ) {
+    return api.patch(
+      `/public/${encodeURIComponent(
+        token
+      )}/file/${encodeURIComponent(
+        fileId
+      )}/content`,
+      {
+        content,
+        password,
+      }
+    );
+  },
+
+
+  // ==========================================================
+  // RENAME PUBLIC FILE
+  // ==========================================================
+
+  renamePublicFile(
+    token,
+    fileId,
+    name,
+    password = null
+  ) {
+    return api.patch(
+      `/public/${encodeURIComponent(
+        token
+      )}/file/${encodeURIComponent(
+        fileId
+      )}`,
+      {
+        name,
+        password,
+      }
+    );
+  },
+
+
+  // ==========================================================
+  // MOVE PUBLIC FILE
+  // ==========================================================
+
+  movePublicFile(
+    token,
+    fileId,
+    folderId,
+    password = null
+  ) {
+    return api.patch(
+      `/public/${encodeURIComponent(
+        token
+      )}/file/${encodeURIComponent(
+        fileId
+      )}/move`,
+      {
+        folder_id: folderId,
+        password,
+      }
+    );
+  },
+
+
+  // ==========================================================
+  // DELETE PUBLIC FILE
+  // ==========================================================
+
+  deletePublicFile(
+    token,
+    fileId,
+    password = null
+  ) {
+    return api.delete(
+      `/public/${encodeURIComponent(
+        token
+      )}/file/${encodeURIComponent(
+        fileId
+      )}`,
+      {
+        data: {
+          password,
+        },
+      }
+    );
+  },
+
+
+  // ==========================================================
   // GET PUBLIC FOLDER CONTENTS
   // ==========================================================
 

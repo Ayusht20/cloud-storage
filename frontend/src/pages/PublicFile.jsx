@@ -9,6 +9,9 @@ import {
   AlertCircle,
   Loader2,
   Pencil,
+  Save,
+  X,
+  Check,
 } from "lucide-react";
 
 import {
@@ -94,6 +97,63 @@ const getFileIcon = (mimeType) => {
 
 
 // ============================================================
+// BROWSER-EDITABLE FILE TYPES
+// ============================================================
+
+const isEditableMimeType = (
+  mimeType = "",
+  fileName = ""
+) => {
+  const mime = mimeType
+    .toLowerCase()
+    .split(";")[0];
+
+  if (
+    mime.startsWith("text/") ||
+    [
+      "application/json",
+      "application/javascript",
+      "application/xml",
+      "application/x-javascript",
+    ].includes(mime)
+  ) {
+    return true;
+  }
+
+  const extension = fileName
+    .toLowerCase()
+    .split(".")
+    .pop();
+
+  return [
+    "txt",
+    "md",
+    "html",
+    "htm",
+    "css",
+    "js",
+    "jsx",
+    "ts",
+    "tsx",
+    "json",
+    "xml",
+    "csv",
+    "py",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "php",
+    "sql",
+    "sh",
+    "yml",
+    "yaml",
+  ].includes(extension);
+};
+
+
+// ============================================================
 // PUBLIC FILE
 // ============================================================
 
@@ -127,6 +187,24 @@ const PublicFile = () => {
 
   const [passwordError, setPasswordError] =
     useState("");
+
+  const [editorOpen, setEditorOpen] =
+    useState(false);
+
+  const [editorLoading, setEditorLoading] =
+    useState(false);
+
+  const [editorSaving, setEditorSaving] =
+    useState(false);
+
+  const [editorContent, setEditorContent] =
+    useState("");
+
+  const [editorError, setEditorError] =
+    useState("");
+
+  const [editorSaved, setEditorSaved] =
+    useState(false);
 
 
   // ==========================================================
@@ -308,6 +386,114 @@ const PublicFile = () => {
 
 
   // ==========================================================
+  // PUBLIC PERMISSION
+  // ==========================================================
+
+  const permission =
+    file?.permission || "viewer";
+
+  const isViewer =
+    permission === "viewer";
+
+  const isEditor =
+    permission === "editor";
+
+
+  // ==========================================================
+  // PUBLIC EDITOR
+  // ==========================================================
+
+  const canEditFile =
+    isEditor &&
+    isEditableMimeType(
+      file?.mime_type,
+      file?.name
+    );
+
+
+  const openEditor = async () => {
+    if (!canEditFile || !file?.id) {
+      return;
+    }
+
+    setEditorOpen(true);
+    setEditorLoading(true);
+    setEditorError("");
+    setEditorSaved(false);
+
+    try {
+      const data =
+        await publicLinkService.getPublicFileContent(
+          token,
+          file.id,
+          password || null
+        );
+
+      setEditorContent(
+        data?.content ?? ""
+      );
+    } catch (err) {
+      setEditorError(
+        err?.message ||
+          "Unable to load file content."
+      );
+    } finally {
+      setEditorLoading(false);
+    }
+  };
+
+
+  const closeEditor = () => {
+    if (editorSaving) {
+      return;
+    }
+
+    setEditorOpen(false);
+    setEditorError("");
+    setEditorSaved(false);
+  };
+
+
+  const saveEditor = async () => {
+    if (!canEditFile || !file?.id) {
+      return;
+    }
+
+    setEditorSaving(true);
+    setEditorError("");
+    setEditorSaved(false);
+
+    try {
+      const data =
+        await publicLinkService.updatePublicFileContent(
+          token,
+          file.id,
+          editorContent,
+          password || null
+        );
+
+      setFile((current) => ({
+        ...current,
+        size:
+          data?.size ??
+          new Blob([
+            editorContent,
+          ]).size,
+      }));
+
+      setEditorSaved(true);
+    } catch (err) {
+      setEditorError(
+        err?.message ||
+          "Unable to save file."
+      );
+    } finally {
+      setEditorSaving(false);
+    }
+  };
+
+
+  // ==========================================================
   // DOWNLOAD
   // ==========================================================
 
@@ -326,20 +512,6 @@ const PublicFile = () => {
       "noopener,noreferrer"
     );
   };
-
-
-  // ==========================================================
-  // PUBLIC PERMISSION
-  // ==========================================================
-
-  const permission =
-    file?.permission || "viewer";
-
-  const isViewer =
-    permission === "viewer";
-
-  const isEditor =
-    permission === "editor";
 
 
   // ==========================================================
@@ -604,13 +776,20 @@ const PublicFile = () => {
           <div className="flex items-center gap-2">
 
             {isEditor && (
-              <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 sm:flex">
-
-                <Pencil size={14} />
-
-                Editor
-
-              </div>
+              <button
+                type="button"
+                onClick={openEditor}
+                disabled={!canEditFile}
+                title={
+                  canEditFile
+                    ? "Edit file"
+                    : "This file type cannot be edited in the browser"
+                }
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Pencil size={15} />
+                Edit
+              </button>
             )}
 
 
@@ -636,6 +815,114 @@ const PublicFile = () => {
 
       </header>
 
+
+      {editorOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 sm:p-6">
+          <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-semibold text-slate-900">
+                  Edit {file.name}
+                </h2>
+
+                <p className="mt-1 text-xs text-slate-400">
+                  Editor access • Changes are saved to the shared file
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {editorSaved && (
+                  <span className="hidden items-center gap-1 text-xs font-medium text-emerald-600 sm:flex">
+                    <Check size={14} />
+                    Saved
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={closeEditor}
+                  disabled={editorSaving}
+                  className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {editorLoading ? (
+              <div className="flex flex-1 items-center justify-center text-slate-500">
+                <div className="flex items-center gap-3">
+                  <Loader2
+                    size={20}
+                    className="animate-spin"
+                  />
+                  Loading file content...
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 overflow-hidden bg-slate-950 p-3 sm:p-5">
+                  <textarea
+                    value={editorContent}
+                    onChange={(event) => {
+                      setEditorContent(
+                        event.target.value
+                      );
+                      setEditorSaved(false);
+                    }}
+                    spellCheck={false}
+                    className="h-full w-full resize-none rounded-xl border border-slate-700 bg-slate-900 p-5 font-mono text-sm leading-6 text-slate-100 outline-none focus:border-slate-500"
+                  />
+                </div>
+
+                {editorError && (
+                  <div className="border-t border-red-100 bg-red-50 px-5 py-3 text-sm text-red-600">
+                    {editorError}
+                  </div>
+                )}
+
+                <div className="flex shrink-0 items-center justify-between border-t border-slate-200 px-5 py-4">
+                  <p className="text-xs text-slate-400">
+                    {editorContent.length.toLocaleString()} characters
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={closeEditor}
+                      disabled={editorSaving}
+                      className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      <X size={16} />
+                      Close
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={saveEditor}
+                      disabled={editorSaving}
+                      className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {editorSaving ? (
+                        <Loader2
+                          size={16}
+                          className="animate-spin"
+                        />
+                      ) : (
+                        <Save size={16} />
+                      )}
+
+                      {editorSaving
+                        ? "Saving..."
+                        : "Save changes"}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ====================================================
           CONTENT
