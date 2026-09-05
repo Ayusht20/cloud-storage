@@ -78,6 +78,40 @@ const shareService = {
     );
   },
 
+
+  // ==================================================
+  // GET SHARED FILE CONTENT
+  // ==================================================
+
+  getSharedFileContent(
+    fileId
+  ) {
+    return api.get(
+      `/shares/shared/${encodeURIComponent(
+        fileId
+      )}/content`
+    );
+  },
+
+
+  // ==================================================
+  // UPDATE SHARED FILE CONTENT
+  // ==================================================
+
+  updateSharedFileContent(
+    fileId,
+    content
+  ) {
+    return api.patch(
+      `/shares/shared/${encodeURIComponent(
+        fileId
+      )}/content`,
+      {
+        content,
+      }
+    );
+  },
+
 };
 
 
