@@ -6,7 +6,7 @@ from fastapi import (
     status,
 )
 from urllib.request import urlopen
-from sqlalchemy import select
+from sqlalchemy import select ,or_
 from sqlalchemy.orm import Session
 from app.services.storage_service import (
     get_download_url,
@@ -32,6 +32,7 @@ from app.schemas.share import (
     SharedFileContentUpdateRequest,
 )
 
+from sqlalchemy.orm import joinedload
 
 router = APIRouter(
     prefix="/shares",
@@ -796,19 +797,13 @@ def delete_share(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # --------------------------------------------------------
-    # File share
-    # --------------------------------------------------------
-
     share = db.scalar(
         select(Share)
-        .join(
-            File,
-            Share.file_id == File.id,
+        .options(
+            joinedload(Share.file)
         )
         .where(
-            Share.id == share_id,
-            File.owner_id == current_user.id,
+            Share.id == share_id
         )
     )
 
@@ -817,6 +812,35 @@ def delete_share(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Share not found",
         )
+
+    # ======================================================
+    # AUTHORIZATION
+    # ======================================================
+
+    is_recipient = (
+        share.shared_with_user_id ==
+        current_user.id
+    )
+
+    is_owner = (
+        share.file is not None
+        and share.file.owner_id ==
+        current_user.id
+    )
+
+    if not is_recipient and not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to remove this share",
+        )
+
+    # ======================================================
+    # DELETE ONLY THE SHARE RELATION
+    #
+    # IMPORTANT:
+    # We do NOT modify File.is_deleted.
+    # The actual file remains untouched.
+    # ======================================================
 
     db.delete(share)
     db.commit()

@@ -70,6 +70,9 @@ const shareService = {
 
   // ==================================================
   // REMOVE SHARE
+  //
+  // Removes ONLY the current user's share/access.
+  // Does NOT delete the actual file.
   // ==================================================
 
   deleteShare(shareId) {
