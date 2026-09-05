@@ -23,7 +23,7 @@ app = FastAPI(
 
 origins = [
     "http://localhost:5173",
-    "https://cloud-storage-tawny.vercel.app"
+    "https://cloud-storage-be298qba4-ayusht20s-projects.vercel.app"
 ]
 
 
