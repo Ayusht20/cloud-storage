@@ -58,3 +58,14 @@ class SharedFolderResponse(BaseModel):
     owner_id: str
     parent_id: str | None
     role: ShareRole
+
+class SharedFileContentResponse(BaseModel):
+    id: str
+    name: str
+    mime_type: str | None
+    size: int
+    content: str
+    role: ShareRole
+
+class SharedFileContentUpdateRequest(BaseModel):
+    content: str

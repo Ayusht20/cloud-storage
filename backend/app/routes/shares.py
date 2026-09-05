@@ -5,10 +5,13 @@ from fastapi import (
     Response,
     status,
 )
-
+from urllib.request import urlopen
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
+from app.services.storage_service import (
+    get_download_url,
+    upload_file,
+)
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 
@@ -25,6 +28,8 @@ from app.schemas.share import (
     ShareUpdateRequest,
     SharedFileResponse,
     SharedFolderResponse,
+    SharedFileContentResponse,
+    SharedFileContentUpdateRequest,
 )
 
 
@@ -33,7 +38,99 @@ router = APIRouter(
     tags=["Sharing"],
 )
 
+# ============================================================
+# SHARED FILE EDITOR HELPERS
+# ============================================================
 
+def _is_text_editable(file: File) -> bool:
+
+    mime_type = (
+        (file.mime_type or "")
+        .lower()
+        .split(";")[0]
+    )
+
+    if (
+        mime_type.startswith("text/")
+        or mime_type in {
+            "application/json",
+            "application/javascript",
+            "application/xml",
+            "application/x-javascript",
+        }
+    ):
+        return True
+
+    name = file.name or ""
+
+    extension = (
+        name.lower().rsplit(".", 1)[-1]
+        if "." in name
+        else ""
+    )
+
+    return extension in {
+        "txt",
+        "md",
+        "html",
+        "htm",
+        "css",
+        "js",
+        "jsx",
+        "ts",
+        "tsx",
+        "json",
+        "xml",
+        "csv",
+        "py",
+        "java",
+        "c",
+        "cpp",
+        "h",
+        "hpp",
+        "php",
+        "sql",
+        "sh",
+        "yml",
+        "yaml",
+    }
+
+
+def _get_shared_file(
+    file_id: str,
+    current_user: User,
+    db: Session,
+):
+    result = db.execute(
+        select(Share, File)
+        .join(
+            File,
+            Share.file_id == File.id,
+        )
+        .where(
+            Share.file_id == file_id,
+            Share.shared_with_user_id == current_user.id,
+            File.is_deleted.is_(False),
+        )
+    ).first()
+
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shared file not found",
+        )
+
+    return result
+
+
+def _require_shared_editor(
+    share: Share,
+):
+    if share.role != "editor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have editor permission for this file",
+        )
 # ============================================================
 # CREATE FILE SHARE
 # ============================================================
@@ -303,7 +400,158 @@ def create_folder_share(
         role=share.role,
     )
 
+# ============================================================
+# GET SHARED FILE CONTENT
+#
+# Authenticated recipient only.
+#
+# Viewer  -> can read
+# Editor  -> can read + edit
+# ============================================================
 
+@router.get(
+    "/shared/{file_id}/content",
+    response_model=SharedFileContentResponse,
+)
+def get_shared_file_content(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    share, file_record = _get_shared_file(
+        file_id,
+        current_user,
+        db,
+    )
+
+    if not _is_text_editable(file_record):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="This file type cannot be edited in the browser",
+        )
+
+    try:
+
+        download_url = get_download_url(
+            public_id=file_record.storage_public_id,
+            resource_type=file_record.resource_type,
+        )
+
+        with urlopen(
+            download_url,
+            timeout=30,
+        ) as response:
+
+            raw_content = response.read()
+
+        content = raw_content.decode(
+            "utf-8",
+            errors="replace",
+        )
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unable to read file content",
+        ) from exc
+
+    return SharedFileContentResponse(
+        id=str(file_record.id),
+        name=file_record.name,
+        mime_type=file_record.mime_type,
+        size=len(raw_content),
+        content=content,
+        role=share.role,
+    )
+
+# ============================================================
+# UPDATE SHARED FILE CONTENT
+#
+# Editor only.
+# ============================================================
+
+@router.patch(
+    "/shared/{file_id}/content",
+    response_model=SharedFileContentResponse,
+)
+def update_shared_file_content(
+    file_id: str,
+    data: SharedFileContentUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+
+    share, file_record = _get_shared_file(
+        file_id,
+        current_user,
+        db,
+    )
+
+    _require_shared_editor(share)
+
+    if not _is_text_editable(file_record):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="This file type cannot be edited in the browser",
+        )
+
+    content_bytes = data.content.encode(
+        "utf-8"
+    )
+
+    try:
+
+        upload_result = upload_file(
+            file=content_bytes,
+            filename=file_record.name,
+            content_type=(
+                file_record.mime_type
+                or "text/plain"
+            ),
+            folder=(
+                f"cloud-storage-service/"
+                f"users/{file_record.owner_id}"
+            ),
+        )
+
+        file_record.storage_public_id = (
+            upload_result["public_id"]
+        )
+
+        file_record.storage_url = (
+            upload_result["secure_url"]
+        )
+
+        file_record.resource_type = (
+            upload_result["resource_type"]
+        )
+
+        file_record.size = len(
+            content_bytes
+        )
+
+        db.commit()
+        db.refresh(file_record)
+
+    except Exception as exc:
+
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to save file content",
+        ) from exc
+
+    return SharedFileContentResponse(
+        id=str(file_record.id),
+        name=file_record.name,
+        mime_type=file_record.mime_type,
+        size=file_record.size,
+        content=data.content,
+        role=share.role,
+    )
 # ============================================================
 # LIST FILES SHARED WITH CURRENT USER
 # ============================================================
