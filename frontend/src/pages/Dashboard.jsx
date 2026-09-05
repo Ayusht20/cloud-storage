@@ -41,39 +41,6 @@ const ROOT_FOLDER = {
 const Dashboard = () => {
   const { user, logout } = useAuth();
 
-  // ==================================================
-  // PERMISSIONS
-  // ==================================================
-
-  const getPermission = (item) => {
-    if (
-      item?.owner_id &&
-      user?.id &&
-      item.owner_id === user.id
-    ) {
-      return "owner";
-    }
-
-    return (
-      item?.permission ||
-      item?.role ||
-      "owner"
-    );
-  };
-
-  const canEditItem = (item) => {
-    const permission = getPermission(item);
-
-    return (
-      permission === "owner" ||
-      permission === "editor"
-    );
-  };
-
-  const canShareItem = (item) => {
-    return getPermission(item) === "owner";
-  };
-
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
 
@@ -268,18 +235,6 @@ const Dashboard = () => {
   };
 
 
-  useEffect(() => {
-    loadNotifications();
-
-    const interval =
-      window.setInterval(
-        loadNotifications,
-        30000
-      );
-
-    return () =>
-      window.clearInterval(interval);
-  }, []);
 
 
   const unreadNotifications =
@@ -288,15 +243,14 @@ const Dashboard = () => {
     );
 
 
-const handleNotificationClick = async (
-  notification
-) => {
-  try {
-    // --------------------------------------------------------
-    // MARK AS READ
-    // --------------------------------------------------------
+  const handleNotificationClick = async (
+    notification
+  ) => {
+    if (notification.is_read) {
+      return;
+    }
 
-    if (!notification.is_read) {
+    try {
       const updated =
         await notificationService.markAsRead(
           notification.id
@@ -309,69 +263,13 @@ const handleNotificationClick = async (
             : item
         )
       );
+    } catch (err) {
+      console.error(
+        "Failed to mark notification as read",
+        err
+      );
     }
-
-    // --------------------------------------------------------
-    // CLOSE NOTIFICATION DROPDOWN
-    // --------------------------------------------------------
-
-    setNotificationOpen(false);
-
-    // --------------------------------------------------------
-    // OPEN SHARED FILE INSIDE DASHBOARD
-    // --------------------------------------------------------
-
-    if (notification.file_id) {
-      try {
-        const file =
-          await fileService.getFile(
-            notification.file_id
-          );
-
-        await handleView(file);
-
-        return;
-      } catch (err) {
-        setError(
-          err.message ||
-            "Unable to open the shared file"
-        );
-
-        return;
-      }
-    }
-
-    // --------------------------------------------------------
-    // OPEN SHARED FOLDER INSIDE DASHBOARD
-    // --------------------------------------------------------
-
-    if (notification.folder_id) {
-      try {
-        const folder =
-          await folderService.getFolder(
-            notification.folder_id
-          );
-
-        await loadFolderContents(
-          folder
-        );
-
-        return;
-      } catch (err) {
-        setError(
-          err.message ||
-            "Unable to open the shared folder"
-        );
-      }
-    }
-
-  } catch (err) {
-    console.error(
-      "Failed to handle notification",
-      err
-    );
-  }
-};
+  };
 
 
   const handleMarkAllNotificationsRead =
@@ -661,51 +559,7 @@ const handleNotificationClick = async (
 
     }
   };
-// ==================================================
-// RENAME FOLDER
-// ==================================================
 
-const handleRenameFolder = async (
-  folder
-) => {
-  const newName =
-    window.prompt(
-      "Enter new folder name",
-      folder.name
-    );
-
-  if (
-    !newName ||
-    !newName.trim() ||
-    newName.trim() === folder.name
-  ) {
-    return;
-  }
-
-  try {
-    setError("");
-
-    await folderService.updateFolder(
-      folder.id,
-      newName.trim()
-    );
-
-    if (currentFolder) {
-      await loadFolderContents(
-        currentFolder,
-        breadcrumbs
-      );
-    } else {
-      await loadRootContents();
-    }
-
-  } catch (err) {
-    setError(
-      err.message ||
-        "Failed to rename folder"
-    );
-  }
-};
 
   // ==================================================
   // DELETE FILE
@@ -918,10 +772,9 @@ const handleRenameFolder = async (
   // MOVE
   // ==================================================
 
-const loadMoveFolders = async (
-  folderId = null,
-  movingItem = fileToMove
-) =>  {
+  const loadMoveFolders = async (
+    folderId = null
+  ) => {
 
     setMoveLoading(true);
 
@@ -949,34 +802,13 @@ const loadMoveFolders = async (
         folderList =
           data?.folders || [];
       }
-folderList =
-  folderList.filter(
-    (folder) => {
 
-      // Never show the current folder
-if (
-  movingItem?._moveType ===
-    "folder" &&
-  folder.id ===
-    movingItem?.id
-) {
-  return false;
-}
-
-      // Never allow a folder to be
-      // moved into itself
-      if (
-        fileToMove?._moveType ===
-          "folder" &&
-        folder.id ===
-          fileToMove?.id
-      ) {
-        return false;
-      }
-
-      return true;
-    }
-  );
+      folderList =
+        folderList.filter(
+          (folder) =>
+            folder.id !==
+            currentFolder?.id
+        );
 
       setMoveFolders(
         folderList
@@ -999,30 +831,23 @@ if (
   };
 
 
-const handleMove = async (
-  item,
-  itemType = "file"
-) => {
-  setError("");
+  const handleMove = async (
+    file
+  ) => {
 
-  const moveItem = {
-    ...item,
-    _moveType: itemType,
+    setError("");
+
+    setFileToMove(file);
+
+    setMovePath([
+      ROOT_FOLDER,
+    ]);
+
+    setMoveModalOpen(true);
+
+    await loadMoveFolders(null);
   };
 
-  setFileToMove(moveItem);
-
-  setMovePath([
-    ROOT_FOLDER,
-  ]);
-
-  setMoveModalOpen(true);
-
-  await loadMoveFolders(
-    null,
-    moveItem
-  );
-};
 
   const handleMoveFolderOpen =
     async (folder) => {
@@ -1115,90 +940,68 @@ const handleMove = async (
   };
 
 
-const handleConfirmMove =
-  async () => {
+  const handleConfirmMove =
+    async () => {
 
-    if (!fileToMove) {
-      return;
-    }
+      if (!fileToMove) {
+        return;
+      }
 
-    const destination =
-      movePath[
-        movePath.length - 1
-      ];
+      const destination =
+        movePath[
+          movePath.length - 1
+        ];
 
-    const itemType =
-      fileToMove._moveType ||
-      "file";
+      if (
+        destination.id ===
+        (currentFolder?.id || null)
+      ) {
 
-    if (
-      destination.id ===
-      (currentFolder?.id || null)
-    ) {
-      setError(
-        `The ${
-          itemType === "folder"
-            ? "folder"
-            : "file"
-        } is already in this folder`
-      );
-
-      return;
-    }
-
-    setMoving(true);
-    setError("");
-
-    try {
-
-      if (itemType === "folder") {
-
-        await folderService.moveFolder(
-          fileToMove.id,
-          destination.id || null
+        setError(
+          "The file is already in this folder"
         );
 
-      } else {
+        return;
+      }
+
+      setMoving(true);
+      setError("");
+
+      try {
 
         await fileService.moveFile(
           fileToMove.id,
           destination.id || null
         );
 
-      }
+        closeMoveModal();
 
-      closeMoveModal();
+        if (currentFolder) {
 
-      if (currentFolder) {
+          await loadFolderContents(
+            currentFolder,
+            breadcrumbs
+          );
 
-        await loadFolderContents(
-          currentFolder,
-          breadcrumbs
+        } else {
+
+          await loadRootContents();
+
+        }
+
+      } catch (err) {
+
+        setError(
+          err.message ||
+            "Failed to move file"
         );
 
-      } else {
+      } finally {
 
-        await loadRootContents();
+        setMoving(false);
 
       }
-
-    } catch (err) {
-
-      setError(
-        err.message ||
-          `Failed to move ${
-            itemType === "folder"
-              ? "folder"
-              : "file"
-          }`
-      );
-
-    } finally {
-
-      setMoving(false);
-
-    }
-  };
+    };
 
 
   // ==================================================
@@ -1290,11 +1093,15 @@ const handleConfirmMove =
 
               <button
                 type="button"
-                onClick={() =>
-                  setNotificationOpen(
-                    (open) => !open
-                  )
-                }
+                onClick={async () => {
+                  const nextOpen = !notificationOpen;
+
+                  setNotificationOpen(nextOpen);
+
+                  if (nextOpen) {
+                    await loadNotifications();
+                  }
+                }}
                 className="relative flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
                 title="Notifications"
               >
@@ -1603,38 +1410,15 @@ const handleConfirmMove =
                   {filteredFolders.map(
                     (folder) => (
 
-<div
-  key={folder.id}
-  className="relative z-20"
->
 <FolderCard
+  key={folder.id}
   folder={folder}
-  permission={getPermission(folder)}
   onOpen={handleFolderOpen}
-
-  onRename={
-    canEditItem(folder)
-      ? handleRenameFolder
-      : undefined
-  }
-
-  onMove={
-    canEditItem(folder)
-      ? (item) =>
-          handleMove(
-            item,
-            "folder"
-          )
-      : undefined
-  }
-
-  onDelete={
-    canEditItem(folder)
-      ? handleDeleteFolder
-      : undefined
-  }
+  // onRename={handleRenameFolder}
+  // onShare={handleShareFolder}
+  // onMove={handleMoveFolder}
+  onDelete={handleDeleteFolder}
 />
-</div>
 
                     )
                   )}
@@ -1698,41 +1482,32 @@ const handleConfirmMove =
                   {filteredFiles.map(
                     (file) => (
 
-                      <div
-                        key={file.id}
-                        className="relative z-0"
-                      >
-                        <FileCard
-                          file={file}
-                          permission={getPermission(file)}
-                          onView={handleView}
-                          onDownload={handleDownload}
-                          onRename={
-                            canEditItem(file)
-                              ? handleRename
-                              : undefined
-                          }
-                          onMove={
-  canEditItem(file)
-    ? (item) =>
-        handleMove(
-          item,
-          "file"
-        )
-    : undefined
-}
-                          onShare={
-                            canShareItem(file)
-                              ? handleShare
-                              : undefined
-                          }
-                          onDelete={
-                            canEditItem(file)
-                              ? handleDeleteFile
-                              : undefined
-                          }
-                        />
-                      </div>
+                      <FileCard
+                        key={
+                          file.id
+                        }
+                        file={
+                          file
+                        }
+                        onView={
+                          handleView
+                        }
+                        onDownload={
+                          handleDownload
+                        }
+                        onRename={
+                          handleRename
+                        }
+                        onMove={
+                          handleMove
+                        }
+                        onShare={
+                          handleShare
+                        }
+                        onDelete={
+                          handleDeleteFile
+                        }
+                      />
 
                     )
                   )}
@@ -1813,12 +1588,10 @@ const handleConfirmMove =
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
 
               <div className="min-w-0">
-<h2 className="font-semibold text-slate-900">
-  Move{" "}
-  {fileToMove?._moveType === "folder"
-    ? "folder"
-    : "file"}
-</h2>
+
+                <h2 className="font-semibold text-slate-900">
+                  Move file
+                </h2>
 
                 <p
                   className="mt-1 truncate text-xs text-slate-400"
@@ -1987,13 +1760,9 @@ const handleConfirmMove =
                     No subfolders
                   </p>
 
-<p className="mt-1 text-xs text-slate-400">
-  You can move the{" "}
-  {fileToMove?._moveType === "folder"
-    ? "folder"
-    : "file"}{" "}
-  here.
-</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    You can move the file here.
+                  </p>
 
                 </div>
 
