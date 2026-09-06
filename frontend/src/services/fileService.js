@@ -1,6 +1,14 @@
 import api from "./api";
 
 
+// ==========================================================
+// MAXIMUM FILE SIZE
+// ==========================================================
+
+const MAX_FILE_SIZE =
+  50 * 1024 * 1024; // 50 MB
+
+
 const fileService = {
 
   // ==========================================================
@@ -32,6 +40,36 @@ const fileService = {
     file,
     folderId = null
   ) {
+
+    // --------------------------------------------------------
+    // VALIDATE FILE
+    // --------------------------------------------------------
+
+    if (!file) {
+      throw new Error(
+        "No file selected."
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // 50 MB LIMIT
+    // --------------------------------------------------------
+
+    if (
+      file.size >
+      MAX_FILE_SIZE
+    ) {
+      throw new Error(
+        "File size cannot exceed 50 MB."
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // CREATE FORM DATA
+    // --------------------------------------------------------
+
     const formData =
       new FormData();
 
@@ -41,6 +79,10 @@ const fileService = {
     );
 
 
+    // --------------------------------------------------------
+    // BUILD ENDPOINT
+    // --------------------------------------------------------
+
     const endpoint =
       folderId
         ? `/files/upload?folder_id=${encodeURIComponent(
@@ -48,6 +90,10 @@ const fileService = {
           )}`
         : "/files/upload";
 
+
+    // --------------------------------------------------------
+    // UPLOAD
+    // --------------------------------------------------------
 
     return api.post(
       endpoint,
@@ -60,7 +106,9 @@ const fileService = {
   // GET SINGLE FILE METADATA
   // ==========================================================
 
-  getFile(fileId) {
+  getFile(
+    fileId
+  ) {
     return api.get(
       `/files/${encodeURIComponent(
         fileId
@@ -73,7 +121,9 @@ const fileService = {
   // GET ACTUAL FILE CONTENT
   // ==========================================================
 
-  getFileContent(fileId) {
+  getFileContent(
+    fileId
+  ) {
     return api.getBlob(
       `/files/${encodeURIComponent(
         fileId
@@ -89,6 +139,7 @@ const fileService = {
   async downloadFile(
     file
   ) {
+
     const blob =
       await this.getFileContent(
         file.id
@@ -173,7 +224,9 @@ const fileService = {
   // MOVE TO TRASH
   // ==========================================================
 
-  deleteFile(fileId) {
+  deleteFile(
+    fileId
+  ) {
     return api.delete(
       `/files/${encodeURIComponent(
         fileId
