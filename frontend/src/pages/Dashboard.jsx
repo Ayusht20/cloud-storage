@@ -891,7 +891,47 @@ const Dashboard = () => {
       );
     };
 
+// ==================================================
+// RENAME FOLDER
+// ==================================================
 
+const handleRenameFolder = async (folder) => {
+  const newName = window.prompt(
+    "Enter new folder name",
+    folder.name
+  );
+
+  if (
+    !newName ||
+    !newName.trim() ||
+    newName.trim() === folder.name
+  ) {
+    return;
+  }
+
+  try {
+    setError("");
+
+    await folderService.updateFolder(
+      folder.id,
+      newName.trim()
+    );
+
+    if (currentFolder) {
+      await loadFolderContents(
+        currentFolder,
+        breadcrumbs
+      );
+    } else {
+      await loadRootContents();
+    }
+  } catch (err) {
+    setError(
+      err.message ||
+        "Failed to rename folder"
+    );
+  }
+};
   const handleMoveBack =
     async () => {
 
@@ -1402,30 +1442,33 @@ const Dashboard = () => {
               </div>
 
 
-              {filteredFolders.length >
-              0 ? (
+{filteredFolders.length > 0 ? (
+  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    {filteredFolders.map((folder) => (
 
-                  {filteredFolders.map(
-                    (folder) => (
+      <div
+        key={folder.id}
+        className="relative z-10"
+      >
 
-<FolderCard
-  key={folder.id}
-  folder={folder}
-  onOpen={handleFolderOpen}
-  // onRename={handleRenameFolder}
-  // onShare={handleShareFolder}
-  // onMove={handleMoveFolder}
-  onDelete={handleDeleteFolder}
-/>
+        <FolderCard
+          folder={folder}
+          permission="owner"
+          onOpen={handleFolderOpen}
+          onRename={handleRenameFolder}
+          onMove={(item) =>
+            handleMove(item, "folder")
+          }
+          onDelete={handleDeleteFolder}
+        />
 
-                    )
-                  )}
+      </div>
 
-                </div>
+    ))}
 
-              ) : (
+  </div>
+) :  (
 
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
 

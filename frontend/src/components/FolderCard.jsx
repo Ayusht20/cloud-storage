@@ -16,7 +16,7 @@ import {
 
 const FolderCard = ({
   folder,
-  permission,
+  permission = "owner",
   onOpen,
   onRename,
   onShare,
@@ -40,7 +40,6 @@ const FolderCard = ({
 
   const canShare =
     permission === "owner";
-
 
   const isShared =
     permission &&
@@ -102,7 +101,25 @@ const FolderCard = ({
 
   return (
     <div
-      className="group relative z-0 flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+      className="
+        group
+        relative
+        z-10
+        flex
+        w-full
+        items-center
+        gap-4
+        rounded-2xl
+        border
+        border-slate-200
+        bg-white
+        p-4
+        text-left
+        transition
+        hover:-translate-y-0.5
+        hover:border-slate-300
+        hover:shadow-md
+      "
     >
 
       {/* ==================================================
@@ -114,10 +131,29 @@ const FolderCard = ({
         onClick={() =>
           onOpen(folder)
         }
-        className="flex min-w-0 flex-1 items-center gap-4 text-left"
+        className="
+          flex
+          min-w-0
+          flex-1
+          items-center
+          gap-4
+          text-left
+        "
       >
 
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+        <div
+          className="
+            flex
+            h-12
+            w-12
+            shrink-0
+            items-center
+            justify-center
+            rounded-xl
+            bg-slate-100
+            text-slate-700
+          "
+        >
           <Folder size={24} />
         </div>
 
@@ -125,21 +161,45 @@ const FolderCard = ({
         <div className="min-w-0 flex-1">
 
           <p
-            className="truncate font-semibold text-slate-800"
+            className="
+              truncate
+              font-semibold
+              text-slate-800
+            "
             title={folder.name}
           >
             {folder.name}
           </p>
 
 
-          <div className="mt-2 flex items-center gap-2">
+          <div
+            className="
+              mt-2
+              flex
+              items-center
+              gap-2
+            "
+          >
 
             <p className="text-xs text-slate-400">
               Folder
             </p>
 
+
             {isShared && (
-              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-600">
+              <span
+                className="
+                  inline-flex
+                  items-center
+                  rounded-full
+                  bg-blue-50
+                  px-2
+                  py-0.5
+                  text-[11px]
+                  font-medium
+                  text-blue-600
+                "
+              >
                 Shared
               </span>
             )}
@@ -148,7 +208,14 @@ const FolderCard = ({
 
 
           {isShared && (
-            <p className="mt-1 text-xs capitalize text-slate-400">
+            <p
+              className="
+                mt-1
+                text-xs
+                capitalize
+                text-slate-400
+              "
+            >
               {permission}
             </p>
           )}
@@ -164,7 +231,11 @@ const FolderCard = ({
 
       <div
         ref={menuRef}
-        className="relative z-50 shrink-0"
+        className="
+          relative
+          z-50
+          shrink-0
+        "
       >
 
         <button
@@ -179,7 +250,18 @@ const FolderCard = ({
             );
 
           }}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          className="
+            flex
+            h-9
+            w-9
+            items-center
+            justify-center
+            rounded-lg
+            text-slate-400
+            transition
+            hover:bg-slate-100
+            hover:text-slate-700
+          "
           title="Folder actions"
         >
 
@@ -197,15 +279,32 @@ const FolderCard = ({
         {menuOpen && (
 
           <div
-            className="absolute right-0 top-full z-[100] mt-2 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+            className="
+              absolute
+              right-0
+              top-full
+              z-[999]
+              mt-2
+              w-48
+              overflow-hidden
+              rounded-xl
+              border
+              border-slate-200
+              bg-white
+              py-1
+              shadow-xl
+            "
             onClick={(event) =>
               event.stopPropagation()
             }
           >
 
-            {/* RENAME */}
+            {/* ==================================================
+                RENAME
+            ================================================== */}
 
             {canEdit && onRename && (
+
               <button
                 type="button"
                 onClick={() =>
@@ -213,17 +312,33 @@ const FolderCard = ({
                     onRename
                   )
                 }
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+                className="
+                  flex
+                  w-full
+                  items-center
+                  gap-3
+                  px-4
+                  py-2.5
+                  text-sm
+                  text-slate-700
+                  transition
+                  hover:bg-slate-50
+                "
               >
                 <Pencil size={16} />
                 Rename
               </button>
+
             )}
 
 
-            {/* SHARE — OWNER ONLY */}
+            {/* ==================================================
+                SHARE
+                Only rendered when a share handler exists.
+            ================================================== */}
 
             {canShare && onShare && (
+
               <button
                 type="button"
                 onClick={() =>
@@ -231,17 +346,32 @@ const FolderCard = ({
                     onShare
                   )
                 }
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+                className="
+                  flex
+                  w-full
+                  items-center
+                  gap-3
+                  px-4
+                  py-2.5
+                  text-sm
+                  text-slate-700
+                  transition
+                  hover:bg-slate-50
+                "
               >
                 <Share2 size={16} />
                 Share
               </button>
+
             )}
 
 
-            {/* MOVE */}
+            {/* ==================================================
+                MOVE
+            ================================================== */}
 
             {canEdit && onMove && (
+
               <button
                 type="button"
                 onClick={() =>
@@ -249,19 +379,40 @@ const FolderCard = ({
                     onMove
                   )
                 }
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+                className="
+                  flex
+                  w-full
+                  items-center
+                  gap-3
+                  px-4
+                  py-2.5
+                  text-sm
+                  text-slate-700
+                  transition
+                  hover:bg-slate-50
+                "
               >
                 <Move size={16} />
                 Move
               </button>
+
             )}
 
 
-            {/* DELETE */}
+            {/* ==================================================
+                DELETE
+            ================================================== */}
 
             {canEdit && onDelete && (
+
               <>
-                <div className="my-1 border-t border-slate-100" />
+                <div
+                  className="
+                    my-1
+                    border-t
+                    border-slate-100
+                  "
+                />
 
                 <button
                   type="button"
@@ -270,21 +421,45 @@ const FolderCard = ({
                       onDelete
                     )
                   }
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    gap-3
+                    px-4
+                    py-2.5
+                    text-sm
+                    text-red-600
+                    transition
+                    hover:bg-red-50
+                  "
                 >
                   <Trash2 size={16} />
                   Move to Trash
                 </button>
+
               </>
+
             )}
 
 
-            {/* VIEWER */}
+            {/* ==================================================
+                VIEWER
+            ================================================== */}
 
             {permission === "viewer" && (
-              <div className="px-4 py-2.5 text-xs text-slate-400">
+
+              <div
+                className="
+                  px-4
+                  py-2.5
+                  text-xs
+                  text-slate-400
+                "
+              >
                 View only
               </div>
+
             )}
 
           </div>
