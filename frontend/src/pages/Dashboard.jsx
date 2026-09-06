@@ -1521,39 +1521,47 @@ const handleRenameFolder = async (folder) => {
               0 ? (
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+{filteredFiles.map(
+  (file) => (
 
-                  {filteredFiles.map(
-                    (file) => (
+    <FileCard
+      key={file.id}
 
-                      <FileCard
-                        key={
-                          file.id
-                        }
-                        file={
-                          file
-                        }
-                        onView={
-                          handleView
-                        }
-                        onDownload={
-                          handleDownload
-                        }
-                        onRename={
-                          handleRename
-                        }
-                        onMove={
-                          handleMove
-                        }
-                        onShare={
-                          handleShare
-                        }
-                        onDelete={
-                          handleDeleteFile
-                        }
-                      />
+      file={file}
 
-                    )
-                  )}
+      permission="owner"
+
+      onView={
+        handleView
+      }
+
+      onDownload={
+        handleDownload
+      }
+
+      onRename={
+        handleRename
+      }
+
+      onMove={
+        (item) =>
+          handleMove(
+            item,
+            "file"
+          )
+      }
+
+      onShare={
+        handleShare
+      }
+
+      onDelete={
+        handleDeleteFile
+      }
+    />
+
+  )
+)}
 
                 </div>
 
