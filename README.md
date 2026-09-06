@@ -51,23 +51,28 @@ https://cloud-storage-ynj7.onrender.com
 
 ### 📄 File Actions
 
-![File Actions](./screenshots/file-actions.png)
+![File Actions](./screenshots/fileoperation.png)
 
 ### 📁 Folder Actions
 
-![Folder Actions](./screenshots/folder-actions.png)
+![Folder Actions](./screenshots/move-folder.png)
+![Folder Actions](./screenshots/rename-folder.png)
+![Folder Actions](./screenshots/trash-folder.png)
 
 ### 🤝 File Sharing
 
-![File Sharing](./screenshots/share-file.png)
+![File Sharing](./screenshots/sharefileemail.png)
 
 ### 📂 Shared Files
 
-![Shared Files](./screenshots/shared-files.png)
+![Shared Files](./screenshots/shared.png)
 
 ### 🔗 Public Sharing
 
-![Public Sharing](./screenshots/public-link.png)
+![Public Sharing](./screenshots/public.png)
+![Public Sharing](./screenshots/publicsecret.png)
+![Public Sharing](./screenshots/public_link.png)    
+![Public Sharing](./screenshots/publicedit.png)
 
 ### 🔔 Notifications
 
@@ -75,7 +80,8 @@ https://cloud-storage-ynj7.onrender.com
 
 ### 🗑️ Trash
 
-![Trash](./screenshots/trash.png)
+![Trash](./screenshots/trashfile.png)
+![Trash](./screenshots/trash2.png)
 
 ---
 
