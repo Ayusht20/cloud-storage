@@ -32,6 +32,10 @@ router = APIRouter(
 )
 
 
+# ==========================================================
+# REGISTER
+# ==========================================================
+
 @router.post(
     "/register",
     response_model=UserResponse,
@@ -69,6 +73,10 @@ def register(
     )
 
 
+# ==========================================================
+# LOGIN
+# ==========================================================
+
 @router.post("/login")
 def login(
     user_data: LoginRequest,
@@ -97,21 +105,29 @@ def login(
     access_token = create_access_token(str(user.id))
     refresh_token = create_refresh_token(str(user.id))
 
+    # ------------------------------------------------------
+    # ACCESS TOKEN COOKIE
+    # ------------------------------------------------------
+
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,
+        samesite="none",
         max_age=15 * 60,
     )
+
+    # ------------------------------------------------------
+    # REFRESH TOKEN COOKIE
+    # ------------------------------------------------------
 
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,
+        samesite="none",
         max_age=7 * 24 * 60 * 60,
     )
 
@@ -125,6 +141,10 @@ def login(
         ),
     }
 
+
+# ==========================================================
+# REFRESH ACCESS TOKEN
+# ==========================================================
 
 @router.post("/refresh")
 def refresh_token(
@@ -140,6 +160,7 @@ def refresh_token(
 
     try:
         user_id = decode_refresh_token(refresh_token)
+
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -164,12 +185,16 @@ def refresh_token(
 
     new_access_token = create_access_token(str(user.id))
 
+    # ------------------------------------------------------
+    # REPLACE ACCESS TOKEN COOKIE
+    # ------------------------------------------------------
+
     response.set_cookie(
         key="access_token",
         value=new_access_token,
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,
+        samesite="none",
         max_age=15 * 60,
     )
 
@@ -178,26 +203,35 @@ def refresh_token(
     }
 
 
+# ==========================================================
+# LOGOUT
+# ==========================================================
+
 @router.post("/logout")
 def logout(response: Response):
+
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,
+        samesite="none",
     )
 
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=False,
-        samesite="lax",
+        secure=True,
+        samesite="none",
     )
 
     return {
         "message": "Logout successful",
     }
 
+
+# ==========================================================
+# CURRENT USER
+# ==========================================================
 
 @router.get(
     "/me",
