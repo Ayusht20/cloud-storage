@@ -766,7 +766,8 @@ const Dashboard = () => {
       nextBreadcrumbs
     );
   };
-
+const [moveItemType, setMoveItemType] =
+  useState(null);
 
   // ==================================================
   // MOVE
@@ -831,22 +832,25 @@ const Dashboard = () => {
   };
 
 
-  const handleMove = async (
-    file
-  ) => {
+const handleMove = async (
+  item,
+  type = "file"
+) => {
 
-    setError("");
+  setError("");
 
-    setFileToMove(file);
+  setFileToMove(item);
 
-    setMovePath([
-      ROOT_FOLDER,
-    ]);
+  setMoveItemType(type);
 
-    setMoveModalOpen(true);
+  setMovePath([
+    ROOT_FOLDER,
+  ]);
 
-    await loadMoveFolders(null);
-  };
+  setMoveModalOpen(true);
+
+  await loadMoveFolders(null);
+};
 
 
   const handleMoveFolderOpen =
@@ -980,68 +984,89 @@ const handleRenameFolder = async (folder) => {
   };
 
 
-  const handleConfirmMove =
-    async () => {
+const handleConfirmMove =
+  async () => {
 
-      if (!fileToMove) {
-        return;
-      }
+    if (!fileToMove) {
+      return;
+    }
 
-      const destination =
-        movePath[
-          movePath.length - 1
-        ];
+    const destination =
+      movePath[
+        movePath.length - 1
+      ];
+
+    if (
+      destination.id ===
+      (currentFolder?.id || null)
+    ) {
+
+      setError(
+        `The ${
+          moveItemType === "folder"
+            ? "folder"
+            : "file"
+        } is already in this folder`
+      );
+
+      return;
+    }
+
+    setMoving(true);
+    setError("");
+
+    try {
 
       if (
-        destination.id ===
-        (currentFolder?.id || null)
+        moveItemType === "folder"
       ) {
 
-        setError(
-          "The file is already in this folder"
+        await folderService.moveFolder(
+          fileToMove.id,
+          destination.id || null
         );
 
-        return;
-      }
-
-      setMoving(true);
-      setError("");
-
-      try {
+      } else {
 
         await fileService.moveFile(
           fileToMove.id,
           destination.id || null
         );
 
-        closeMoveModal();
+      }
 
-        if (currentFolder) {
+      closeMoveModal();
 
-          await loadFolderContents(
-            currentFolder,
-            breadcrumbs
-          );
+      if (currentFolder) {
 
-        } else {
-
-          await loadRootContents();
-
-        }
-
-      } catch (err) {
-
-        setError(
-          err.message ||
-            "Failed to move file"
+        await loadFolderContents(
+          currentFolder,
+          breadcrumbs
         );
 
-      } finally {
+      } else {
 
-        setMoving(false);
+        await loadRootContents();
 
       }
-    };
+
+    } catch (err) {
+
+      setError(
+        err.message ||
+          `Failed to move ${
+            moveItemType === "folder"
+              ? "folder"
+              : "file"
+          }`
+      );
+
+    } finally {
+
+      setMoving(false);
+
+    }
+  };
 
 
   // ==================================================
@@ -1457,9 +1482,13 @@ const handleRenameFolder = async (folder) => {
           permission="owner"
           onOpen={handleFolderOpen}
           onRename={handleRenameFolder}
-          onMove={(item) =>
-            handleMove(item, "folder")
-          }
+onMove={
+  (folder) =>
+    handleMove(
+      folder,
+      "folder"
+    )
+}
           onDelete={handleDeleteFolder}
         />
 
@@ -1543,13 +1572,13 @@ const handleRenameFolder = async (folder) => {
         handleRename
       }
 
-      onMove={
-        (item) =>
-          handleMove(
-            item,
-            "file"
-          )
-      }
+onMove={
+  (file) =>
+    handleMove(
+      file,
+      "file"
+    )
+}
 
       onShare={
         handleShare
