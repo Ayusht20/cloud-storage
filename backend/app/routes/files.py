@@ -233,12 +233,18 @@ async def upload_user_file(
         db.refresh(file_record)
 
     except Exception as exc:
-        db.rollback()
+        import traceback
+
+        print("\n" + "=" * 70)
+        print("UPLOAD ERROR")
+        print(repr(exc))
+        traceback.print_exc()
+        print("=" * 70 + "\n")
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="File upload failed",
-        ) from exc
+            status_code=500,
+            detail=str(exc),
+        )
 
     # --------------------------------------------------------
     # Response
