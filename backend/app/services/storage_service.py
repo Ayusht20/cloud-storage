@@ -68,58 +68,36 @@ def upload_file(
     """
     Upload a file to Cloudinary.
 
-    Files larger than 50 MB are rejected
-    before being uploaded to Cloudinary.
+    Supports both file-like objects and raw bytes.
     """
 
-    # --------------------------------------------------------
-    # CHECK FILE SIZE BEFORE UPLOAD
-    # --------------------------------------------------------
+    resource_type = get_resource_type(content_type)
 
     try:
-        current_position = file.tell()
+        # --------------------------------------------------
+        # Convert raw bytes into a file-like object
+        # --------------------------------------------------
 
-        file.seek(0, 2)
-        file_size = file.tell()
+        if isinstance(file, bytes):
+            from io import BytesIO
 
-        file.seek(current_position)
+            file = BytesIO(file)
 
-    except (OSError, AttributeError):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to determine file size.",
+        # --------------------------------------------------
+        # Upload to Cloudinary
+        # --------------------------------------------------
+
+        return cloudinary.uploader.upload(
+            file,
+            resource_type=resource_type,
+            folder=folder,
+            use_filename=True,
+            unique_filename=True,
+            overwrite=False,
         )
 
-    # --------------------------------------------------------
-    # 50 MB LIMIT
-    # --------------------------------------------------------
-
-    if file_size > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="File size cannot exceed 50 MB.",
-        )
-
-    # --------------------------------------------------------
-    # DETERMINE RESOURCE TYPE
-    # --------------------------------------------------------
-
-    resource_type = get_resource_type(
-        content_type
-    )
-
-    # --------------------------------------------------------
-    # UPLOAD TO CLOUDINARY
-    # --------------------------------------------------------
-
-    return cloudinary.uploader.upload(
-        file,
-        resource_type=resource_type,
-        folder=folder,
-        use_filename=True,
-        unique_filename=True,
-        overwrite=False,
-    )
+    except Exception:
+        raise
 
 
 # ============================================================
