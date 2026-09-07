@@ -10,7 +10,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -44,6 +44,30 @@ router = APIRouter(
 )
 
 
+def get_user_storage_used(
+    db: Session,
+    user_id,
+) -> int:
+    """
+    Calculate the total storage currently used by a user.
+
+    Only non-deleted files are counted.
+    The value is returned in bytes.
+    """
+
+    total_used = db.scalar(
+        select(
+            func.coalesce(
+                func.sum(File.size),
+                0,
+            )
+        ).where(
+            File.owner_id == user_id,
+            File.is_deleted.is_(False),
+        )
+    )
+
+    return int(total_used or 0)
 # ============================================================
 # UPLOAD FILE
 # ============================================================
@@ -127,6 +151,10 @@ async def upload_user_file(
     # Check maximum file size
     # --------------------------------------------------------
 
+    # --------------------------------------------------------
+    # Check maximum file size
+    # --------------------------------------------------------
+
     max_size = settings.MAX_FILE_SIZE_MB * 1024 * 1024
 
     if file_size > max_size:
@@ -137,6 +165,41 @@ async def upload_user_file(
                 f"limit of {settings.MAX_FILE_SIZE_MB} MB"
             ),
         )
+
+    # --------------------------------------------------------
+    # Check user storage quota
+    # --------------------------------------------------------
+
+    storage_limit = current_user.storage_limit
+
+    # Always calculate actual usage from stored files.
+    storage_used = get_user_storage_used(
+        db,
+        current_user.id,
+    )
+
+    if storage_used + file_size > storage_limit:
+        remaining_storage = max(
+            storage_limit - storage_used,
+            0,
+        )
+
+        remaining_mb = remaining_storage / (
+            1024 * 1024
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                "Storage limit exceeded. "
+                f"You have approximately "
+                f"{remaining_mb:.1f} MB remaining."
+            ),
+        )
+
+    # --------------------------------------------------------
+    # Upload to storage
+    # --------------------------------------------------------
 
     # --------------------------------------------------------
     # Upload to storage
