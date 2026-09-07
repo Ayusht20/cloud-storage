@@ -98,7 +98,52 @@ const Dashboard = () => {
   const [shareFile, setShareFile] =
     useState(null);
 
+const [storageUsage, setStorageUsage] = useState(null);
+const loadStorageUsage = async () => {
+  try {
+    const data =
+      await fileService.getStorageUsage();
 
+    setStorageUsage(data);
+  } catch (err) {
+    console.error(
+      "Failed to load storage usage:",
+      err
+    );
+  }
+};
+const formatStorageSize = (
+  bytes
+) => {
+  if (!bytes) {
+    return "0 B";
+  }
+
+  const units = [
+    "B",
+    "KB",
+    "MB",
+    "GB",
+    "TB",
+  ];
+
+  let value = bytes;
+  let index = 0;
+
+  while (
+    value >= 1024 &&
+    index < units.length - 1
+  ) {
+    value /= 1024;
+    index++;
+  }
+
+  return `${value.toFixed(
+    value >= 10 || index === 0
+      ? 0
+      : 1
+  )} ${units[index]}`;
+};
   // ==================================================
   // MOVE MODAL
   // ==================================================
@@ -207,6 +252,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadRootContents();
+         loadStorageUsage();
   }, []);
 
 
@@ -342,6 +388,8 @@ const Dashboard = () => {
         );
       } else {
         await loadRootContents();
+         loadStorageUsage();
+
       }
     } catch (err) {
       setError(
@@ -391,6 +439,8 @@ const Dashboard = () => {
         );
       } else {
         await loadRootContents();
+         loadStorageUsage();
+
       }
     } catch (err) {
       setError(
@@ -547,6 +597,8 @@ const Dashboard = () => {
       } else {
 
         await loadRootContents();
+         loadStorageUsage();
+
 
       }
 
@@ -596,6 +648,8 @@ const Dashboard = () => {
       } else {
 
         await loadRootContents();
+         loadStorageUsage();
+
 
       }
 
@@ -645,6 +699,8 @@ const Dashboard = () => {
       } else {
 
         await loadRootContents();
+         loadStorageUsage();
+
 
       }
 
@@ -698,6 +754,8 @@ const Dashboard = () => {
       ) {
 
         await loadRootContents();
+         loadStorageUsage();
+
 
         return;
       }
@@ -736,6 +794,8 @@ const Dashboard = () => {
     ) {
 
       await loadRootContents();
+         loadStorageUsage();
+
 
       return;
     }
@@ -754,6 +814,8 @@ const Dashboard = () => {
     if (!parent.id) {
 
       await loadRootContents();
+         loadStorageUsage();
+
 
       return;
     }
@@ -928,6 +990,8 @@ const handleRenameFolder = async (folder) => {
       );
     } else {
       await loadRootContents();
+         loadStorageUsage();
+
     }
   } catch (err) {
     setError(
@@ -1047,6 +1111,8 @@ const handleConfirmMove =
       } else {
 
         await loadRootContents();
+         loadStorageUsage();
+
 
       }
 
@@ -1414,7 +1480,33 @@ const handleConfirmMove =
           </div>
 
         )}
-
+        {/* STORAGE USAGE */}
+        {storageUsage && (
+          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Storage</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {formatStorageSize(storageUsage.used)} of {formatStorageSize(storageUsage.limit)} used
+                </p>
+              </div>
+              <p className="text-sm font-semibold text-slate-700">
+                {storageUsage.percentage}%
+              </p>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-slate-900 transition-all duration-300"
+                style={{
+                  width: `${Math.min(storageUsage.percentage || 0, 100)}%`,
+                }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              {formatStorageSize(storageUsage.remaining)} remaining
+            </p>
+          </div>
+        )}
 
         {/* CONTENT */}
 

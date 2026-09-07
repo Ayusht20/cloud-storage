@@ -233,7 +233,9 @@ const fileService = {
       )}`
     );
   },
-
+getStorageUsage() {
+  return api.get("/storage");
+},
 };
 
 
