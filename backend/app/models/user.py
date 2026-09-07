@@ -1,11 +1,18 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, BigInteger, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
+
+
+# ============================================================
+# STORAGE LIMITS
+# ============================================================
+
+DEFAULT_STORAGE_LIMIT = 2_500_000_000  # 2.5 GB
 
 
 class User(Base):
@@ -39,6 +46,26 @@ class User(Base):
         default=True,
         nullable=False,
     )
+
+    # ========================================================
+    # STORAGE
+    # ========================================================
+
+    storage_limit: Mapped[int] = mapped_column(
+        BigInteger,
+        default=DEFAULT_STORAGE_LIMIT,
+        nullable=False,
+    )
+
+    storage_used: Mapped[int] = mapped_column(
+        BigInteger,
+        default=0,
+        nullable=False,
+    )
+
+    # ========================================================
+    # TIMESTAMPS
+    # ========================================================
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
