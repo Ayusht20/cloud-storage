@@ -10,6 +10,93 @@ import {
 } from "lucide-react";
 
 import { NavLink } from "react-router-dom";
+
+const premiumMotion = `
+  @keyframes cloudFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes cloudSlideIn {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .cloud-page-enter {
+    animation: cloudFadeIn 420ms cubic-bezier(.22,1,.36,1) both;
+  }
+
+  .cloud-sidebar-item {
+    transition:
+      transform 220ms cubic-bezier(.22,1,.36,1),
+      background-color 220ms ease,
+      color 220ms ease,
+      box-shadow 220ms ease;
+  }
+
+  .cloud-sidebar-item:hover {
+    transform: translateX(3px);
+  }
+
+  .cloud-brand-icon {
+    transition:
+      transform 300ms cubic-bezier(.22,1,.36,1),
+      box-shadow 300ms ease;
+  }
+
+  .cloud-brand-icon:hover {
+    transform: translateY(-2px) rotate(-3deg);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, .14);
+  }
+
+  .cloud-search {
+    transition:
+      border-color 220ms ease,
+      background-color 220ms ease,
+      box-shadow 220ms ease,
+      transform 220ms cubic-bezier(.22,1,.36,1);
+  }
+
+  .cloud-search:focus {
+    transform: translateY(-1px);
+  }
+
+  .cloud-header-action {
+    transition:
+      transform 200ms cubic-bezier(.22,1,.36,1),
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+
+  .cloud-header-action:hover {
+    transform: translateY(-2px);
+  }
+
+  .cloud-user-card {
+    transition:
+      transform 220ms cubic-bezier(.22,1,.36,1),
+      box-shadow 220ms ease,
+      border-color 220ms ease;
+  }
+
+  .cloud-user-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
+    border-color: rgb(226 232 240);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cloud-page-enter,
+    .cloud-sidebar-item,
+    .cloud-brand-icon,
+    .cloud-search,
+    .cloud-header-action,
+    .cloud-user-card {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+`;
 import { useAuth } from "../context/AuthContext";
 
 
@@ -60,7 +147,10 @@ const Layout = ({
 
 
   return (
-    <div className="min-h-screen bg-[#f7f8fa] text-slate-900">
+    <>
+      <style>{premiumMotion}</style>
+
+      <div className="cloud-page-enter min-h-screen bg-[#f5f7fb] text-slate-900">
 
 
       {/* ======================================================
@@ -92,12 +182,13 @@ const Layout = ({
               BRAND
           -------------------------------------------------- */}
 
-          <div className="flex h-[76px] items-center border-b border-slate-100 px-6">
+          <div className="flex h-[82px] items-center border-b border-slate-100 px-6">
 
             <div className="flex items-center gap-3">
 
               <div
                 className="
+                  cloud-header-action
                   flex
                   h-10
                   w-10
@@ -165,6 +256,7 @@ const Layout = ({
                     to={path}
                     className={({ isActive }) =>
                       `
+                        cloud-sidebar-item
                         group
                         flex
                         items-center
@@ -254,6 +346,7 @@ const Layout = ({
 
             <div
               className="
+                cloud-user-card
                 flex
                 items-center
                 gap-3
@@ -267,6 +360,7 @@ const Layout = ({
 
               <div
                 className="
+                  cloud-brand-icon
                   flex
                   h-10
                   w-10
@@ -394,6 +488,7 @@ const Layout = ({
                 }
                 placeholder="Search files and folders..."
                 className="
+                  cloud-search
                   h-11
                   w-full
                   rounded-xl
@@ -502,6 +597,7 @@ const Layout = ({
       </div>
 
     </div>
+    </>
   );
 };
 
