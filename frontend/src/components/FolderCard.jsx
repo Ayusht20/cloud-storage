@@ -223,7 +223,9 @@ const FolderCard = ({
         onClick={() =>
           onOpen(folder)
         }
-        className="flex min-w-0 flex-1 items-center gap-4 text-left"
+        aria-label={`Open ${folder.name}`}
+        title={`Open ${folder.name}`}
+        className="flex min-w-0 flex-1 items-center gap-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2"
       >
 
         <div className="drive-card-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
@@ -288,7 +290,9 @@ const FolderCard = ({
             );
 
           }}
-          className="drive-menu-button flex h-9 w-9 items-center justify-center rounded-lg text-slate-400"
+          aria-label={`Actions for ${folder.name}`}
+          aria-expanded={menuOpen}
+          className="drive-menu-button flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
           title="Folder actions"
         >
 
