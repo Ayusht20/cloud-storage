@@ -304,7 +304,9 @@ const FileCard = ({
                 (value) => !value
               );
             }}
-            className="drive-menu-button rounded-lg p-2 text-slate-400"
+            aria-label={`Actions for ${file.name}`}
+          aria-expanded={menuOpen}
+          className="drive-menu-button rounded-lg p-2 text-slate-400 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
             title="File actions"
           >
             <MoreVertical size={18} />
