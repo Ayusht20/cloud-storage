@@ -606,9 +606,9 @@ const Shared = () => {
     return (
       <Layout>
 
-        <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex min-h-[60vh] items-center justify-center bg-slate-50/40">
 
-          <div className="flex items-center gap-3 text-slate-500">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-medium text-slate-500 shadow-sm">
 
             <Loader2
               size={22}
@@ -633,19 +633,19 @@ const Shared = () => {
   return (
     <Layout>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-9">
 
         {/* ====================================================
             HEADER
             ==================================================== */}
 
-        <div className="mb-8">
+        <div className="mb-9 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-[34px]">
             Shared with me
           </h1>
 
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1.5 text-sm leading-6 text-slate-500">
             Files and folders shared with you
           </p>
 
@@ -658,7 +658,7 @@ const Shared = () => {
 
         {error && (
 
-          <div className="mb-6 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+          <div className="mb-7 rounded-2xl border border-red-100 bg-red-50 px-4 py-3.5 text-sm font-medium leading-6 text-red-600 shadow-sm">
 
             {error}
 
@@ -675,13 +675,13 @@ const Shared = () => {
 
           <section className="mb-10">
 
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-4">
 
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-bold tracking-tight text-slate-900">
                 Shared folders
               </h2>
 
-              <span className="text-sm text-slate-400">
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
                 {folders.length}
               </span>
 
@@ -697,12 +697,12 @@ const Shared = () => {
                     key={
                       folder.share_id
                     }
-                    className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                    className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
                   >
 
                     <div className="flex items-center gap-3">
 
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-colors duration-200 group-hover:bg-indigo-100">
 
                         <Folder
                           size={22}
@@ -714,7 +714,7 @@ const Shared = () => {
                       <div className="min-w-0 flex-1">
 
                         <p
-                          className="truncate font-semibold text-slate-800"
+                          className="truncate text-sm font-semibold text-slate-900"
                           title={
                             folder.folder_name
                           }
@@ -725,7 +725,7 @@ const Shared = () => {
                         </p>
 
 
-                        <p className="mt-1 text-xs capitalize text-slate-400">
+                        <p className="mt-1 text-xs font-medium capitalize text-slate-400">
                           {
                             folder.role
                           }
@@ -753,13 +753,13 @@ const Shared = () => {
 
         <section>
 
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between gap-4">
 
-            <h2 className="text-lg font-semibold text-slate-900">
+            <h2 className="text-lg font-bold tracking-tight text-slate-900">
               Shared files
             </h2>
 
-            <span className="text-sm text-slate-400">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
               {files.length}
             </span>
 
@@ -768,9 +768,9 @@ const Shared = () => {
 
           {files.length === 0 ? (
 
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-sm">
 
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
 
                 <File
                   size={24}
@@ -780,7 +780,7 @@ const Shared = () => {
               </div>
 
 
-              <h3 className="mt-4 font-semibold text-slate-700">
+              <h3 className="mt-4 text-base font-bold text-slate-800">
                 Nothing shared with you yet
               </h3>
 
@@ -811,14 +811,14 @@ const Shared = () => {
                       key={
                         file.share_id
                       }
-                      className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                      className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-[0_10px_30px_rgba(15,23,42,0.08)]"
                     >
 
                       {/* FILE ICON */}
 
                       <div className="flex items-start justify-between">
 
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-colors duration-200 group-hover:bg-indigo-100">
 
                           <Icon
                             size={24}
@@ -827,7 +827,7 @@ const Shared = () => {
                         </div>
 
 
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium capitalize text-slate-500">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold capitalize tracking-wide text-slate-500">
                           {
                             file.role
                           }
@@ -841,7 +841,7 @@ const Shared = () => {
                       <div className="mt-4">
 
                         <p
-                          className="truncate font-semibold text-slate-800"
+                          className="truncate text-sm font-semibold text-slate-900"
                           title={
                             file.file_name
                           }
@@ -865,7 +865,7 @@ const Shared = () => {
 
                       {/* ACTIONS */}
 
-                      <div className="mt-4 grid grid-cols-2 gap-2">
+                      <div className="mt-5 grid grid-cols-2 gap-2">
 
                         {/* VIEW */}
 
@@ -876,7 +876,7 @@ const Shared = () => {
                               file
                             )
                           }
-                          className="flex min-w-0 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+                          className="flex min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-all hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
                         >
 
                           <Eye
@@ -899,7 +899,7 @@ const Shared = () => {
                               file
                             )
                           }
-                          className="flex min-w-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
+                          className="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-slate-800 hover:shadow-sm"
                         >
 
                           <Download
@@ -937,7 +937,7 @@ const Shared = () => {
                                 ? "Edit file"
                                 : "This file type cannot be edited in the browser"
                             }
-                            className="col-span-2 flex w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="col-span-2 flex w-full min-w-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                           >
 
                             <Pencil
@@ -966,7 +966,7 @@ const Shared = () => {
                             deletingFileId ===
                             file.file_id
                           }
-                          className="col-span-2 flex w-full min-w-0 items-center justify-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="col-span-2 flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition-all hover:border-red-200 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
 
                           {deletingFileId ===
@@ -1022,15 +1022,15 @@ const Shared = () => {
       {editorOpen &&
         editorFile && (
 
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 sm:p-6">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[3px] sm:p-6">
 
-            <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.22)]">
 
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
 
                 <div className="min-w-0">
 
-                  <h2 className="truncate text-base font-semibold text-slate-900">
+                  <h2 className="truncate text-base font-bold text-slate-950">
                     Edit{" "}
                     {
                       editorFile.file_name
@@ -1069,7 +1069,7 @@ const Shared = () => {
                     disabled={
                       editorSaving
                     }
-                    className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                    className="rounded-lg p-2 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
                   >
 
                     <X
@@ -1085,7 +1085,7 @@ const Shared = () => {
 
               {editorError && (
 
-                <div className="mx-5 mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <div className="mx-5 mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium leading-6 text-red-600 sm:mx-6">
 
                   {
                     editorError
@@ -1135,7 +1135,7 @@ const Shared = () => {
 
                     }}
                     spellCheck={false}
-                    className="h-full w-full resize-none rounded-xl border border-slate-700 bg-slate-900 p-5 font-mono text-sm leading-6 text-slate-100 outline-none focus:border-slate-500"
+                    className="h-full w-full resize-none rounded-xl border border-slate-700 bg-slate-900 p-5 font-mono text-sm leading-6 text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20"
                   />
 
                 </div>
@@ -1143,7 +1143,7 @@ const Shared = () => {
               )}
 
 
-              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-slate-50/70 px-5 py-4 sm:px-6">
 
                 <button
                   type="button"
@@ -1153,7 +1153,7 @@ const Shared = () => {
                   disabled={
                     editorSaving
                   }
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -1171,7 +1171,7 @@ const Shared = () => {
                       editorError
                     )
                   }
-                  className="flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
 
                   {editorSaving && (
